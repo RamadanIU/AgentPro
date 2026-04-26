@@ -3913,6 +3913,79 @@ button:disabled, .icon-btn:disabled, input:disabled, textarea:disabled {
   filter: saturate(0.6);
 }
 
+/* ============================================================
+   ===== MOBILE TAB SLIDE TRANSITIONS — ELEGANT & SNAPPY =====
+   ============================================================ */
+@keyframes mobilePanelSlideInRight {
+  from { opacity: 0; transform: translate3d(28px, 0, 0); filter: blur(2px); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0);    filter: blur(0); }
+}
+@keyframes mobilePanelSlideInLeft {
+  from { opacity: 0; transform: translate3d(-28px, 0, 0); filter: blur(2px); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0);     filter: blur(0); }
+}
+
+@media (max-width: 768px) {
+  /* Slide-in for the panel that just became active.
+     Direction is set by JS on body[data-slide-dir]. */
+  body[data-slide-dir="right"] .panel.active,
+  body[data-slide-dir="right"] #browserPanelMobile.active,
+  body[data-slide-dir="right"] .terminal-panel-mobile.active {
+    animation: mobilePanelSlideInRight 0.32s var(--ease-out-expo) both;
+  }
+  body[data-slide-dir="left"] .panel.active,
+  body[data-slide-dir="left"] #browserPanelMobile.active,
+  body[data-slide-dir="left"] .terminal-panel-mobile.active {
+    animation: mobilePanelSlideInLeft 0.32s var(--ease-out-expo) both;
+  }
+
+  /* Use 3D transforms for smooth GPU compositing */
+  .panel,
+  #browserPanelMobile,
+  .terminal-panel-mobile {
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+
+  /* Active-tab pill indicator (animates between tabs) */
+  .mobile-tab {
+    position: relative;
+    transition:
+      color     var(--transition),
+      transform var(--transition-spring);
+  }
+  .mobile-tab::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 5px;
+    width: 22px;
+    height: 2px;
+    background: var(--text-0);
+    border-radius: 2px;
+    transform: translateX(-50%) scaleX(0);
+    opacity: 0;
+    transition:
+      transform 0.35s var(--ease-out-expo),
+      opacity   0.25s var(--ease-out-quart),
+      background-color var(--transition);
+    pointer-events: none;
+  }
+  .mobile-tab.active::after {
+    transform: translateX(-50%) scaleX(1);
+    opacity: 1;
+  }
+  .mobile-tab.active .mobile-tab-icon {
+    transform: translateY(-1px) scale(1.06);
+  }
+  .mobile-tab .mobile-tab-icon {
+    transition: transform var(--transition-spring);
+  }
+  .mobile-tab:active .mobile-tab-icon {
+    transform: scale(0.92);
+  }
+}
+
 /* Honor reduced-motion preference globally */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -11576,6 +11649,17 @@ function initMobileTabs() {
 
   const showPanel = (panelId) => {
     if (window.innerWidth > 768) return;
+
+    // Determine slide direction based on current vs target tab index
+    const currentlyActive = panelIds.find(id => document.getElementById(id)?.classList.contains('active'));
+    const oldIdx = panelIds.indexOf(currentlyActive);
+    const newIdx = panelIds.indexOf(panelId);
+    let dir = 'none';
+    if (oldIdx >= 0 && newIdx >= 0 && oldIdx !== newIdx) {
+      dir = newIdx > oldIdx ? 'right' : 'left';
+    }
+    document.body.setAttribute('data-slide-dir', dir);
+
     panelIds.forEach(id => document.getElementById(id)?.classList.remove('active'));
     document.getElementById(panelId)?.classList.add('active');
     document.querySelectorAll('.mobile-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.target === panelId));
