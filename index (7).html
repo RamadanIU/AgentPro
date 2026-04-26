@@ -4601,6 +4601,51 @@ button:disabled, .icon-btn:disabled, input:disabled, textarea:disabled {
         </div>
       </div><!-- /settings-card Workspace -->
 
+      <!-- ══ MCP-СЕРВЕРЫ ══ -->
+      <div class="settings-card">
+        <button class="settings-card-header" onclick="toggleSettingsCard(this)">
+          <i data-lucide="plug-zap" class="settings-card-header-icon"></i>
+          <span class="settings-card-header-label">MCP-серверы</span>
+          <span id="mcpHeaderBadge" style="margin-left:auto;margin-right:8px;font-size:10px;color:var(--text-2);font-weight:500;"></span>
+          <i data-lucide="chevron-down" class="settings-card-chevron"></i>
+        </button>
+        <div class="settings-card-body">
+          <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button id="mcpAddServerBtn" class="input-modern" style="flex:1;min-width:120px;cursor:pointer;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;">
+                <i data-lucide="plus" style="width:13px;height:13px;"></i> Добавить сервер
+              </button>
+              <button id="mcpImportJsonBtn" class="input-modern" style="flex:1;min-width:120px;cursor:pointer;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;">
+                <i data-lucide="upload" style="width:13px;height:13px;"></i> Импорт mcp.json
+              </button>
+              <input type="file" id="mcpImportJsonFile" accept=".json,application/json" style="display:none;" />
+              <button id="mcpExportJsonBtn" class="input-modern" style="flex:0 0 auto;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 12px;" title="Экспорт mcp.json">
+                <i data-lucide="download" style="width:13px;height:13px;"></i>
+              </button>
+              <button id="mcpReconnectAllBtn" class="input-modern" style="flex:0 0 auto;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 12px;" title="Переподключить все">
+                <i data-lucide="refresh-cw" style="width:13px;height:13px;"></i>
+              </button>
+            </div>
+            <div id="mcpBridgeStatus" style="font-size:11px;color:var(--text-2);padding:8px;background:var(--bg-2);border:1px solid var(--border-1);border-radius:var(--r-sm);line-height:1.5;">
+              <span id="mcpBridgeIndicator" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text-3);margin-right:6px;vertical-align:middle;"></span>
+              <span id="mcpBridgeText">Локальный мост (stdio): проверка...</span>
+              <a href="#" id="mcpBridgeHelp" style="float:right;color:var(--info);text-decoration:none;">как запустить?</a>
+            </div>
+          </div>
+
+          <div id="mcpServersList" style="display:flex;flex-direction:column;gap:8px;margin-top:8px;"></div>
+
+          <details style="margin-top:12px;">
+            <summary style="cursor:pointer;font-size:11px;color:var(--text-2);font-weight:600;padding:6px 0;user-select:none;">JSON-RPC лог (последние 50)</summary>
+            <div id="mcpLogPanel" style="max-height:240px;overflow-y:auto;background:var(--code-bg);border:1px solid var(--border-1);border-radius:var(--r-sm);padding:8px;font-family:var(--font-mono);font-size:10px;line-height:1.5;color:var(--text-1);margin-top:6px;"></div>
+          </details>
+
+          <div class="settings-hint" style="margin-top:8px;">
+            Поддерживаются MCP-серверы по транспортам <b>http</b>, <b>sse</b>, <b>ws</b> (удалённые) и <b>stdio</b> (локальные, через мост на <code>ws://127.0.0.1:7777</code>). Формат <code>mcp.json</code> совместим с Claude Desktop / LM Studio.
+          </div>
+        </div>
+      </div><!-- /settings-card MCP -->
+
     </div><!-- /settings-container -->
 
     <!-- Постоянный футер с кнопкой сохранения -->
@@ -8111,6 +8156,495 @@ const toolImpl = {
   }
 };
 
+/* ════════════════════════════════════════════════════════════════════════════
+ * MCP (Model Context Protocol) — клиент для подключения внешних серверов
+ * Поддерживает транспорты: http, sse, ws, stdio (через локальный мост).
+ * Спецификация: https://modelcontextprotocol.io/
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+const MCP_PROTOCOL_VERSION = '2024-11-05';
+const MCP_BRIDGE_URL = 'ws://127.0.0.1:7777';
+const MCP_BRIDGE_HEALTH = 'http://127.0.0.1:7777/health';
+
+/** Проверка доступности локального моста для stdio-серверов */
+async function checkMCPBridge() {
+  try {
+    const res = await fetch(MCP_BRIDGE_HEALTH, { method: 'GET' });
+    if (!res.ok) return { available: false };
+    const data = await res.json().catch(() => ({}));
+    return { available: true, version: data.version || 'unknown' };
+  } catch {
+    return { available: false };
+  }
+}
+
+/** Базовый MCP-клиент: JSON-RPC 2.0 поверх выбранного транспорта */
+class MCPClient {
+  constructor(config, opts = {}) {
+    // config: { name, transport, url, headers, command, args, env, cwd }
+    this.config = config;
+    this.onLog = opts.onLog || (() => {});
+    this.onClose = opts.onClose || (() => {});
+    this._id = 0;
+    this._pending = new Map();   // jsonrpc id -> { resolve, reject, timeout }
+    this._ws = null;
+    this._sse = null;
+    this._sseEndpoint = null;    // POST URL announced by SSE 'endpoint' event
+    this._httpSessionId = null;  // mcp-session-id header for streamable-http
+    this.tools = [];
+    this.serverInfo = null;
+    this.capabilities = null;
+    this.status = 'disconnected';
+    this.error = null;
+  }
+
+  _log(direction, payload) {
+    this.onLog({ ts: Date.now(), server: this.config.name, direction, payload });
+  }
+
+  _nextId() { return ++this._id; }
+
+  async _request(method, params, timeoutMs = 30000) {
+    const id = this._nextId();
+    const msg = { jsonrpc: '2.0', id, method, params: params || {} };
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this._pending.delete(id);
+        reject(new Error(`MCP timeout: ${method}`));
+      }, timeoutMs);
+      this._pending.set(id, {
+        resolve: (v) => { clearTimeout(timer); resolve(v); },
+        reject: (e) => { clearTimeout(timer); reject(e); }
+      });
+      this._send(msg).catch((e) => {
+        clearTimeout(timer);
+        this._pending.delete(id);
+        reject(e);
+      });
+    });
+  }
+
+  _notify(method, params) {
+    return this._send({ jsonrpc: '2.0', method, params: params || {} });
+  }
+
+  async _send(msg) {
+    this._log('out', msg);
+    const t = this.config.transport;
+    if (t === 'ws' || t === 'stdio') {
+      if (!this._ws || this._ws.readyState !== 1) throw new Error('WS не открыт');
+      // Для stdio через бридж — оборачиваем в {type:'rpc', payload}
+      if (t === 'stdio') this._ws.send(JSON.stringify({ type: 'rpc', payload: msg }));
+      else this._ws.send(JSON.stringify(msg));
+      return;
+    }
+    if (t === 'sse') {
+      if (!this._sseEndpoint) throw new Error('SSE endpoint ещё не получен');
+      const r = await fetch(this._sseEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(this.config.headers || {}) },
+        body: JSON.stringify(msg)
+      });
+      if (!r.ok) throw new Error(`SSE POST ${r.status}: ${await r.text().catch(() => '')}`);
+      return;
+    }
+    if (t === 'http') {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        ...(this.config.headers || {})
+      };
+      if (this._httpSessionId) headers['mcp-session-id'] = this._httpSessionId;
+      const r = await fetch(this.config.url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(msg)
+      });
+      const sid = r.headers.get('mcp-session-id');
+      if (sid) this._httpSessionId = sid;
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text().catch(() => '')}`);
+      // Notification → 202 без тела
+      if (r.status === 202 || msg.id === undefined) return;
+      const ct = (r.headers.get('content-type') || '').toLowerCase();
+      if (ct.includes('text/event-stream')) {
+        // Streamable HTTP: одноразовый SSE поток в ответе
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let idx;
+          while ((idx = buf.indexOf('\n\n')) !== -1) {
+            const event = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            this._handleSSEEvent(event);
+          }
+        }
+        return;
+      }
+      const data = await r.json().catch(() => null);
+      if (data) this._handleMessage(data);
+      return;
+    }
+    throw new Error('Неизвестный транспорт MCP: ' + t);
+  }
+
+  _handleSSEEvent(eventBlock) {
+    const lines = eventBlock.split('\n');
+    let event = 'message', data = '';
+    for (const line of lines) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) data += (data ? '\n' : '') + line.slice(5).trim();
+    }
+    if (event === 'endpoint') {
+      // SSE legacy — анонс POST-URL
+      try {
+        const u = new URL(data, this.config.url);
+        this._sseEndpoint = u.toString();
+        this._log('in', { _event: 'endpoint', url: this._sseEndpoint });
+      } catch {
+        this._sseEndpoint = data;
+      }
+      return;
+    }
+    if (!data) return;
+    try {
+      const parsed = JSON.parse(data);
+      this._handleMessage(parsed);
+    } catch (e) {
+      this._log('in', { _parse_error: String(e), raw: data });
+    }
+  }
+
+  _handleMessage(msg) {
+    this._log('in', msg);
+    if (Array.isArray(msg)) { msg.forEach((m) => this._handleMessage(m)); return; }
+    if (msg.id !== undefined && this._pending.has(msg.id)) {
+      const p = this._pending.get(msg.id);
+      this._pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(`[${msg.error.code}] ${msg.error.message || 'MCP error'}`));
+      else p.resolve(msg.result);
+      return;
+    }
+    // notifications от сервера — пока просто логируем
+  }
+
+  async connect() {
+    this.status = 'connecting';
+    this.error = null;
+    const t = this.config.transport;
+    try {
+      if (t === 'ws' || t === 'stdio') {
+        await this._openWS();
+      } else if (t === 'sse') {
+        await this._openSSE();
+      } else if (t === 'http') {
+        // HTTP — без долгоживущего канала; готовы сразу
+      } else {
+        throw new Error('Неизвестный транспорт: ' + t);
+      }
+      const init = await this._request('initialize', {
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        capabilities: { tools: {} },
+        clientInfo: { name: 'AgentPro', version: '1.0.0' }
+      });
+      this.serverInfo = init?.serverInfo || null;
+      this.capabilities = init?.capabilities || null;
+      // Уведомление о готовности
+      try { await this._notify('notifications/initialized'); } catch {}
+      // Загружаем тулы
+      await this.refreshTools();
+      this.status = 'ready';
+    } catch (e) {
+      this.status = 'error';
+      this.error = String(e.message || e);
+      this.close();
+      throw e;
+    }
+  }
+
+  async _openWS() {
+    const url = this.config.transport === 'stdio' ? MCP_BRIDGE_URL : this.config.url;
+    return new Promise((resolve, reject) => {
+      let ws;
+      try { ws = new WebSocket(url); } catch (e) { reject(e); return; }
+      this._ws = ws;
+      let opened = false;
+      ws.onopen = () => {
+        opened = true;
+        if (this.config.transport === 'stdio') {
+          // Сначала просим бридж запустить процесс
+          ws.send(JSON.stringify({
+            type: 'spawn',
+            config: {
+              command: this.config.command,
+              args: this.config.args || [],
+              env: this.config.env || {},
+              cwd: this.config.cwd || undefined
+            }
+          }));
+          // Ждём 'ready' от бриджа
+          // resolve будет ниже в onmessage
+        } else {
+          resolve();
+        }
+      };
+      ws.onerror = (e) => {
+        if (!opened) reject(new Error('WS connect error: ' + (e.message || 'unknown')));
+      };
+      ws.onclose = () => {
+        this._ws = null;
+        this.onClose();
+      };
+      ws.onmessage = (ev) => {
+        let parsed;
+        try { parsed = JSON.parse(ev.data); } catch { return; }
+        if (this.config.transport === 'stdio') {
+          if (parsed.type === 'ready') { resolve(); return; }
+          if (parsed.type === 'stderr') { this._log('in', { _stderr: parsed.text }); return; }
+          if (parsed.type === 'exit') { this._log('in', { _exit: parsed.code }); return; }
+          if (parsed.type === 'error') { reject(new Error(parsed.message || 'bridge error')); return; }
+          if (parsed.type === 'rpc' && parsed.payload) { this._handleMessage(parsed.payload); return; }
+          return;
+        }
+        this._handleMessage(parsed);
+      };
+    });
+  }
+
+  async _openSSE() {
+    return new Promise((resolve, reject) => {
+      try {
+        // EventSource не поддерживает кастомные заголовки; для авторизованных серверов используйте http/ws.
+        const es = new EventSource(this.config.url, { withCredentials: false });
+        this._sse = es;
+        let opened = false;
+        es.onopen = () => { opened = true; };
+        es.onerror = (e) => {
+          if (!opened) reject(new Error('SSE connect failed'));
+        };
+        es.onmessage = (ev) => this._handleSSEEvent('event: message\ndata: ' + ev.data);
+        es.addEventListener('endpoint', (ev) => {
+          this._handleSSEEvent('event: endpoint\ndata: ' + ev.data);
+          if (!this._sseEndpoint) { reject(new Error('SSE endpoint пустой')); return; }
+          resolve();
+        });
+        // На случай если сервер шлёт endpoint как обычный 'message'
+        setTimeout(() => { if (!this._sseEndpoint) reject(new Error('SSE endpoint таймаут')); }, 8000);
+      } catch (e) { reject(e); }
+    });
+  }
+
+  async refreshTools() {
+    const r = await this._request('tools/list', {});
+    this.tools = (r && Array.isArray(r.tools)) ? r.tools : [];
+    return this.tools;
+  }
+
+  async callTool(name, args) {
+    return this._request('tools/call', { name, arguments: args || {} }, 120000);
+  }
+
+  close() {
+    try { if (this._ws) this._ws.close(); } catch {}
+    try { if (this._sse) this._sse.close(); } catch {}
+    this._ws = null; this._sse = null;
+    for (const [, p] of this._pending) { try { p.reject(new Error('MCP closed')); } catch {} }
+    this._pending.clear();
+    this.status = 'disconnected';
+  }
+}
+
+/** Реестр всех MCP-серверов и derived-tooldefs для модели */
+const MCPRegistry = {
+  servers: [],            // [{ id, config, enabled, client, status, tools, error, disabledTools:Set }]
+  logs: [],               // последние JSON-RPC сообщения (для UI)
+  bridgeAvailable: false,
+  _logCap: 500,
+  _listeners: new Set(),
+
+  on(fn) { this._listeners.add(fn); return () => this._listeners.delete(fn); },
+  _emit() { for (const fn of this._listeners) try { fn(); } catch {} },
+
+  load() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('mcp.servers') || '[]');
+      this.servers = raw.map((s) => ({
+        id: s.id || ('mcp_' + Math.random().toString(36).slice(2, 10)),
+        config: s.config,
+        enabled: s.enabled !== false,
+        disabledTools: new Set(s.disabledTools || []),
+        client: null, status: 'disconnected', tools: [], error: null
+      }));
+    } catch { this.servers = []; }
+  },
+
+  save() {
+    const data = this.servers.map((s) => ({
+      id: s.id, config: s.config, enabled: s.enabled,
+      disabledTools: Array.from(s.disabledTools || [])
+    }));
+    localStorage.setItem('mcp.servers', JSON.stringify(data));
+  },
+
+  async addServer(config) {
+    const id = 'mcp_' + Math.random().toString(36).slice(2, 10);
+    const server = { id, config, enabled: true, disabledTools: new Set(), client: null, status: 'disconnected', tools: [], error: null };
+    this.servers.push(server);
+    this.save();
+    this._emit();
+    if (server.enabled) {
+      try { await this.connect(id); } catch (e) { /* статус уже выставлен */ }
+    }
+    return server;
+  },
+
+  async removeServer(id) {
+    const s = this.servers.find(x => x.id === id);
+    if (s && s.client) { try { s.client.close(); } catch {} }
+    this.servers = this.servers.filter(x => x.id !== id);
+    this.save();
+    this._emit();
+  },
+
+  async toggleServer(id, enabled) {
+    const s = this.servers.find(x => x.id === id);
+    if (!s) return;
+    s.enabled = enabled;
+    this.save();
+    if (enabled) {
+      try { await this.connect(id); } catch {}
+    } else if (s.client) {
+      try { s.client.close(); } catch {}
+      s.client = null; s.status = 'disconnected'; s.tools = [];
+    }
+    this._emit();
+  },
+
+  toggleTool(serverId, toolName, enabled) {
+    const s = this.servers.find(x => x.id === serverId);
+    if (!s) return;
+    if (enabled) s.disabledTools.delete(toolName);
+    else s.disabledTools.add(toolName);
+    this.save();
+    this._emit();
+  },
+
+  async connect(id) {
+    const s = this.servers.find(x => x.id === id);
+    if (!s) return;
+    if (s.client) { try { s.client.close(); } catch {} s.client = null; }
+    const client = new MCPClient(s.config, {
+      onLog: (entry) => {
+        this.logs.push(entry);
+        if (this.logs.length > this._logCap) this.logs.splice(0, this.logs.length - this._logCap);
+        this._emit();
+      },
+      onClose: () => {
+        if (s.client === client) {
+          s.status = 'disconnected';
+          s.client = null;
+          this._emit();
+        }
+      }
+    });
+    s.client = client;
+    s.status = 'connecting';
+    s.error = null;
+    this._emit();
+    try {
+      await client.connect();
+      s.status = 'ready';
+      s.tools = client.tools;
+      s.error = null;
+    } catch (e) {
+      s.status = 'error';
+      s.error = String(e.message || e);
+      s.tools = [];
+    }
+    this._emit();
+  },
+
+  async connectAll() {
+    const checks = await checkMCPBridge();
+    this.bridgeAvailable = checks.available;
+    this._emit();
+    await Promise.all(this.servers.filter(s => s.enabled).map(s => this.connect(s.id).catch(() => {})));
+  },
+
+  /** Имя инструмента для модели: mcp__<server>__<tool>. Безопасные символы. */
+  _prefixedName(serverName, toolName) {
+    const safe = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48);
+    return `mcp__${safe(serverName)}__${safe(toolName)}`;
+  },
+
+  /** Tool-defs всех включённых серверов в OpenAI-формате */
+  toolDefs() {
+    const out = [];
+    for (const s of this.servers) {
+      if (!s.enabled || s.status !== 'ready') continue;
+      for (const t of s.tools) {
+        if (s.disabledTools.has(t.name)) continue;
+        out.push({
+          type: 'function',
+          function: {
+            name: this._prefixedName(s.config.name, t.name),
+            description: `[MCP:${s.config.name}] ${t.description || t.name}`,
+            parameters: t.inputSchema || { type: 'object', properties: {} }
+          }
+        });
+      }
+    }
+    return out;
+  },
+
+  /** Найти сервер и оригинальное имя тула по префиксированному имени */
+  resolveTool(prefixedName) {
+    if (typeof prefixedName !== 'string' || !prefixedName.startsWith('mcp__')) return null;
+    for (const s of this.servers) {
+      if (!s.enabled) continue;
+      for (const t of s.tools) {
+        if (this._prefixedName(s.config.name, t.name) === prefixedName) {
+          return { server: s, toolName: t.name };
+        }
+      }
+    }
+    return null;
+  }
+};
+
+/** Преобразует ответ tools/call (MCP) в формат, понятный остальному коду */
+function normalizeMCPResult(result) {
+  if (!result) return { ok: true, content: '' };
+  if (typeof result === 'string') return { ok: true, content: result };
+  const content = Array.isArray(result.content) ? result.content : [];
+  const textParts = [];
+  let imageData = null;
+  const otherParts = [];
+  for (const c of content) {
+    if (!c || typeof c !== 'object') continue;
+    if (c.type === 'text' && typeof c.text === 'string') {
+      textParts.push(c.text);
+    } else if (c.type === 'image' && c.data && c.mimeType) {
+      if (!imageData) imageData = { _isImage: true, _base64: c.data, mime: c.mimeType, status: 'MCP image attached' };
+    } else if (c.type === 'resource' && c.resource) {
+      otherParts.push({ resource: c.resource });
+    } else {
+      otherParts.push(c);
+    }
+  }
+  const out = {};
+  if (result.isError) out.error = textParts.join('\n') || 'MCP tool error';
+  else if (textParts.length) out.text = textParts.join('\n');
+  if (otherParts.length) out.parts = otherParts;
+  if (imageData) Object.assign(out, imageData);
+  if (!Object.keys(out).length) out.ok = true;
+  return out;
+}
+
 /* ========= Состояние плана ========= */
 let currentPlan = [];
 
@@ -8565,11 +9099,13 @@ async function callModelWithRetry(messages, maxRetries = 2) {
  */
 const ORCHESTRATOR_ONLY_TOOLS = ['delegate_task', 'update_plan']; // kept for sub-agent filtering
 function getActiveToolDefs() {
-  return getToolDefsWithSkills();
+  const mcp = (typeof MCPRegistry !== 'undefined') ? MCPRegistry.toolDefs() : [];
+  return [...getToolDefsWithSkills(), ...mcp];
 }
 function getActiveGeminiToolDefs() {
+  const mcp = (typeof MCPRegistry !== 'undefined') ? MCPRegistry.toolDefs() : [];
   return {
-    function_declarations: getToolDefsWithSkills().map(t => ({
+    function_declarations: [...getToolDefsWithSkills(), ...mcp].map(t => ({
       name: t.function.name,
       description: t.function.description,
       parameters: t.function.parameters
@@ -10363,7 +10899,14 @@ async function runSubAgent(task, context = '', stepTitle = 'Sub-task', uiElement
         try { args = safeParseToolArgs(call.function.arguments); } catch {}
         let result;
         try {
-          result = await toolImpl[name](args);
+          // 🔌 MCP routing inside sub-agent
+          const mcpResolved = (typeof MCPRegistry !== 'undefined') ? MCPRegistry.resolveTool(name) : null;
+          if (mcpResolved) {
+            const raw = await mcpResolved.server.client.callTool(mcpResolved.toolName, args);
+            result = normalizeMCPResult(raw);
+          } else {
+            result = await toolImpl[name](args);
+          }
         } catch (e) {
           result = { error: String(e.message || e) };
           subLog.push({ icon: 'x-circle', text: `Ошибка ${name}: ${e.message}` });
@@ -10944,6 +11487,22 @@ async function runAgent(userText) {
     const name = call.function.name;
     let args = {};
     try { args = safeParseToolArgs(call.function.arguments); } catch {}
+
+    // 🔌 MCP routing — names start with mcp__<server>__<tool>
+    if (typeof MCPRegistry !== 'undefined') {
+      const mcpResolved = MCPRegistry.resolveTool(name);
+      if (mcpResolved) {
+        try {
+          const raw = await mcpResolved.server.client.callTool(mcpResolved.toolName, args);
+          const result = normalizeMCPResult(raw);
+          console.log('[MCP TOOL]', name, args, '→', result);
+          return result;
+        } catch (e) {
+          console.error('[MCP TOOL ERROR]', name, e);
+          return { error: String(e.message || e) };
+        }
+      }
+    }
 
     // Handle delegate_task — spawn a sub-agent
     if (name === 'delegate_task') {
@@ -13322,6 +13881,293 @@ const SkillsEngine = (() => {
 })();
 
 document.addEventListener('DOMContentLoaded', () => SkillsEngine.init());
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * MCP UI — карточка в настройках, форма добавления, импорт mcp.json, логи
+ * ════════════════════════════════════════════════════════════════════════════ */
+const MCPUI = (() => {
+  const escapeHtml = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  function renderHeaderBadge() {
+    const el = document.getElementById('mcpHeaderBadge');
+    if (!el) return;
+    const total = MCPRegistry.servers.length;
+    if (!total) { el.textContent = ''; return; }
+    const ready = MCPRegistry.servers.filter(s => s.status === 'ready').length;
+    const tools = MCPRegistry.servers.filter(s => s.enabled && s.status === 'ready')
+      .reduce((n, s) => n + (s.tools.length - (s.disabledTools.size || 0)), 0);
+    el.textContent = `${ready}/${total} · ${tools} tools`;
+  }
+
+  function renderBridge() {
+    const ind = document.getElementById('mcpBridgeIndicator');
+    const txt = document.getElementById('mcpBridgeText');
+    if (!ind || !txt) return;
+    if (MCPRegistry.bridgeAvailable) {
+      ind.style.background = 'var(--success)';
+      txt.innerHTML = 'Локальный мост (stdio): <b style="color:var(--success);">подключён</b> на <code>ws://127.0.0.1:7777</code>';
+    } else {
+      ind.style.background = 'var(--text-3)';
+      txt.innerHTML = 'Локальный мост (stdio): не запущен. <span style="color:var(--text-2);">stdio-серверы недоступны.</span>';
+    }
+  }
+
+  function transportBadge(t) {
+    const colors = { http: 'var(--info)', sse: 'var(--warning)', ws: 'var(--success)', stdio: 'var(--accent)' };
+    return `<span style="font-size:9px;padding:1px 6px;border-radius:var(--r-xs);background:var(--bg-3);color:${colors[t]||'var(--text-2)'};font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">${escapeHtml(t)}</span>`;
+  }
+
+  function statusBadge(status, error) {
+    const map = {
+      ready:        ['var(--success)', '✓ Online',     ''],
+      connecting:   ['var(--warning)', '⟳ Connecting', ''],
+      disconnected: ['var(--text-3)',  '○ Offline',    ''],
+      error:        ['var(--error)',   '✗ Error',      error || '']
+    };
+    const [color, label, hover] = map[status] || map.disconnected;
+    return `<span title="${escapeHtml(hover)}" style="font-size:10px;color:${color};font-weight:600;">${label}</span>`;
+  }
+
+  function renderServerList() {
+    const list = document.getElementById('mcpServersList');
+    if (!list) return;
+    if (!MCPRegistry.servers.length) {
+      list.innerHTML = '<div style="font-size:11px;color:var(--text-2);text-align:center;padding:16px;border:1px dashed var(--border-1);border-radius:var(--r-sm);">Нет настроенных серверов. Нажмите «Добавить сервер» или импортируйте <code>mcp.json</code>.</div>';
+      return;
+    }
+    list.innerHTML = MCPRegistry.servers.map(s => {
+      const cfg = s.config;
+      const target = cfg.transport === 'stdio'
+        ? `${escapeHtml(cfg.command || '')} ${escapeHtml((cfg.args || []).join(' '))}`
+        : escapeHtml(cfg.url || '');
+      const toolRows = (s.tools && s.tools.length)
+        ? s.tools.map(t => {
+            const enabled = !s.disabledTools.has(t.name);
+            return `<label style="display:flex;align-items:center;gap:6px;padding:3px 6px;font-size:10px;color:var(--text-1);cursor:pointer;border-radius:var(--r-xs);" title="${escapeHtml(t.description || '')}">
+              <input type="checkbox" data-mcp-tool-toggle data-server-id="${s.id}" data-tool-name="${escapeHtml(t.name)}" ${enabled ? 'checked' : ''} style="margin:0;cursor:pointer;" />
+              <span style="font-family:var(--font-mono);">${escapeHtml(t.name)}</span>
+              ${t.description ? `<span style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">— ${escapeHtml(t.description.slice(0, 80))}</span>` : ''}
+            </label>`;
+          }).join('')
+        : '<div style="font-size:10px;color:var(--text-2);padding:6px;">Тулы не загружены</div>';
+      return `
+        <div style="border:1px solid var(--border-1);border-radius:var(--r-sm);background:var(--bg-2);overflow:hidden;">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;">
+            <input type="checkbox" data-mcp-server-toggle data-server-id="${s.id}" ${s.enabled ? 'checked' : ''} title="Включить/выключить" style="margin:0;cursor:pointer;flex:0 0 auto;" />
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(cfg.name)}</span>
+                ${transportBadge(cfg.transport)}
+                ${statusBadge(s.status, s.error)}
+                <span style="font-size:10px;color:var(--text-2);">${s.tools.length} tools</span>
+              </div>
+              <div style="font-size:10px;color:var(--text-2);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;">${target}</div>
+              ${s.error ? `<div style="font-size:10px;color:var(--error);margin-top:3px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.error)}</div>` : ''}
+            </div>
+            <button data-mcp-reconnect data-server-id="${s.id}" title="Переподключить" style="background:transparent;border:1px solid var(--border-1);color:var(--text-1);cursor:pointer;border-radius:var(--r-xs);width:24px;height:24px;display:flex;align-items:center;justify-content:center;padding:0;">
+              <i data-lucide="refresh-cw" style="width:11px;height:11px;"></i>
+            </button>
+            <button data-mcp-edit data-server-id="${s.id}" title="Редактировать" style="background:transparent;border:1px solid var(--border-1);color:var(--text-1);cursor:pointer;border-radius:var(--r-xs);width:24px;height:24px;display:flex;align-items:center;justify-content:center;padding:0;">
+              <i data-lucide="pencil" style="width:11px;height:11px;"></i>
+            </button>
+            <button data-mcp-delete data-server-id="${s.id}" title="Удалить" style="background:transparent;border:1px solid var(--border-1);color:var(--error);cursor:pointer;border-radius:var(--r-xs);width:24px;height:24px;display:flex;align-items:center;justify-content:center;padding:0;">
+              <i data-lucide="trash-2" style="width:11px;height:11px;"></i>
+            </button>
+          </div>
+          ${s.tools.length ? `<details style="border-top:1px solid var(--border-1);"><summary style="cursor:pointer;font-size:10px;color:var(--text-2);padding:6px 10px;user-select:none;">Инструменты (${s.tools.length - (s.disabledTools.size || 0)}/${s.tools.length})</summary><div style="padding:4px 10px 8px 10px;display:flex;flex-direction:column;gap:1px;">${toolRows}</div></details>` : ''}
+        </div>
+      `;
+    }).join('');
+    if (window.lucide && window.lucide.createIcons) try { window.lucide.createIcons(); } catch {}
+  }
+
+  function renderLogs() {
+    const panel = document.getElementById('mcpLogPanel');
+    if (!panel) return;
+    const recent = MCPRegistry.logs.slice(-50);
+    if (!recent.length) { panel.innerHTML = '<div style="color:var(--text-3);">— пусто —</div>'; return; }
+    panel.innerHTML = recent.map(e => {
+      const arrow = e.direction === 'out' ? '→' : '←';
+      const color = e.direction === 'out' ? 'var(--info)' : 'var(--success)';
+      const t = new Date(e.ts).toLocaleTimeString();
+      let preview = '';
+      try { preview = JSON.stringify(e.payload); } catch { preview = String(e.payload); }
+      return `<div style="padding:2px 0;border-bottom:1px solid var(--border-1);"><span style="color:var(--text-3);">${t}</span> <span style="color:${color};font-weight:700;">${arrow}</span> <span style="color:var(--text-2);">${escapeHtml(e.server)}</span> <span style="color:var(--text-1);">${escapeHtml(preview.slice(0, 280))}</span></div>`;
+    }).join('');
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  function rerender() {
+    renderHeaderBadge();
+    renderBridge();
+    renderServerList();
+    renderLogs();
+  }
+
+  function openAddDialog(existingId) {
+    const existing = existingId ? MCPRegistry.servers.find(s => s.id === existingId) : null;
+    const cfg = existing ? existing.config : { name: '', transport: 'http', url: '', headers: {}, command: '', args: [], env: {} };
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+      <div style="background:var(--bg-1);border:1px solid var(--border-0);border-radius:var(--r-lg);padding:20px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;font-family:var(--font-sans);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <h3 style="margin:0;font-size:14px;color:var(--text-0);font-weight:600;">${existing ? 'Редактировать' : 'Добавить'} MCP-сервер</h3>
+          <button data-mcp-cancel style="background:transparent;border:none;color:var(--text-2);cursor:pointer;font-size:18px;padding:4px;">×</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <label style="font-size:11px;color:var(--text-1);font-weight:600;">Имя <input data-f="name" class="input-modern" value="${escapeHtml(cfg.name)}" placeholder="my-server" style="margin-top:4px;width:100%;" /></label>
+          <label style="font-size:11px;color:var(--text-1);font-weight:600;">Транспорт
+            <select data-f="transport" class="input-modern" style="margin-top:4px;width:100%;">
+              <option value="http"  ${cfg.transport==='http'?'selected':''}>http (Streamable HTTP / JSON)</option>
+              <option value="sse"   ${cfg.transport==='sse'?'selected':''}>sse (legacy SSE)</option>
+              <option value="ws"    ${cfg.transport==='ws'?'selected':''}>ws (WebSocket)</option>
+              <option value="stdio" ${cfg.transport==='stdio'?'selected':''}>stdio (через локальный мост)</option>
+            </select>
+          </label>
+          <div data-block="remote" style="display:flex;flex-direction:column;gap:10px;">
+            <label style="font-size:11px;color:var(--text-1);font-weight:600;">URL <input data-f="url" class="input-modern" value="${escapeHtml(cfg.url || '')}" placeholder="https://example.com/mcp" style="margin-top:4px;width:100%;" /></label>
+            <label style="font-size:11px;color:var(--text-1);font-weight:600;">Заголовки (JSON, опционально) <textarea data-f="headers" class="input-modern" rows="3" placeholder='{"Authorization":"Bearer ..."}' style="margin-top:4px;width:100%;font-family:var(--font-mono);font-size:11px;">${escapeHtml(JSON.stringify(cfg.headers || {}, null, 2))}</textarea></label>
+          </div>
+          <div data-block="stdio" style="display:flex;flex-direction:column;gap:10px;">
+            <label style="font-size:11px;color:var(--text-1);font-weight:600;">Команда <input data-f="command" class="input-modern" value="${escapeHtml(cfg.command || '')}" placeholder="npx" style="margin-top:4px;width:100%;" /></label>
+            <label style="font-size:11px;color:var(--text-1);font-weight:600;">Аргументы (по строке на каждый) <textarea data-f="args" class="input-modern" rows="3" placeholder="-y&#10;@modelcontextprotocol/server-filesystem&#10;/path/to/dir" style="margin-top:4px;width:100%;font-family:var(--font-mono);font-size:11px;">${escapeHtml((cfg.args || []).join('\n'))}</textarea></label>
+            <label style="font-size:11px;color:var(--text-1);font-weight:600;">Переменные окружения (JSON, опционально) <textarea data-f="env" class="input-modern" rows="2" placeholder='{"FOO":"bar"}' style="margin-top:4px;width:100%;font-family:var(--font-mono);font-size:11px;">${escapeHtml(JSON.stringify(cfg.env || {}, null, 2))}</textarea></label>
+            <div style="font-size:10px;color:var(--text-2);">Требуется запущенный <code>agent-pro-bridge</code> на <code>ws://127.0.0.1:7777</code>.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button data-mcp-cancel class="input-modern" style="cursor:pointer;padding:7px 14px;">Отмена</button>
+          <button data-mcp-save class="input-modern" style="cursor:pointer;padding:7px 14px;background:var(--accent-dim);color:var(--text-0);border-color:var(--accent-border);font-weight:600;">${existing ? 'Сохранить' : 'Добавить и подключить'}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const $ = (sel) => overlay.querySelector(sel);
+    const refreshBlocks = () => {
+      const t = $('[data-f="transport"]').value;
+      $('[data-block="remote"]').style.display = (t === 'http' || t === 'sse' || t === 'ws') ? '' : 'none';
+      $('[data-block="stdio"]').style.display  = (t === 'stdio') ? '' : 'none';
+    };
+    refreshBlocks();
+    $('[data-f="transport"]').addEventListener('change', refreshBlocks);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.closest('[data-mcp-cancel]')) document.body.removeChild(overlay);
+    });
+    $('[data-mcp-save]').addEventListener('click', async () => {
+      const transport = $('[data-f="transport"]').value;
+      const name = $('[data-f="name"]').value.trim() || 'unnamed';
+      let headers = {}; try { headers = JSON.parse($('[data-f="headers"]').value || '{}'); } catch { alert('Невалидный JSON в заголовках'); return; }
+      let env = {}; try { env = JSON.parse($('[data-f="env"]').value || '{}'); } catch { alert('Невалидный JSON в env'); return; }
+      const args = $('[data-f="args"]').value.split('\n').map(s => s.trim()).filter(Boolean);
+      const newCfg = {
+        name, transport,
+        url: $('[data-f="url"]').value.trim(),
+        headers,
+        command: $('[data-f="command"]').value.trim(),
+        args,
+        env
+      };
+      if (existing) {
+        existing.config = newCfg;
+        MCPRegistry.save();
+        document.body.removeChild(overlay);
+        try { await MCPRegistry.connect(existing.id); } catch {}
+      } else {
+        document.body.removeChild(overlay);
+        await MCPRegistry.addServer(newCfg);
+      }
+    });
+  }
+
+  function importMcpJson(text) {
+    let parsed; try { parsed = JSON.parse(text); } catch (e) { alert('Невалидный JSON: ' + e.message); return; }
+    const servers = parsed.mcpServers || parsed.servers || parsed;
+    if (!servers || typeof servers !== 'object') { alert('Не найдено поле mcpServers'); return; }
+    let added = 0;
+    for (const [name, raw] of Object.entries(servers)) {
+      if (!raw || typeof raw !== 'object') continue;
+      let cfg;
+      if (raw.command) {
+        cfg = { name, transport: 'stdio', command: raw.command, args: raw.args || [], env: raw.env || {} };
+      } else if (raw.url) {
+        const t = (raw.type || raw.transport || (raw.url.startsWith('ws') ? 'ws' : 'http')).toLowerCase();
+        cfg = { name, transport: t === 'sse' ? 'sse' : (t === 'ws' || t === 'websocket') ? 'ws' : 'http', url: raw.url, headers: raw.headers || {} };
+      } else {
+        continue;
+      }
+      MCPRegistry.addServer(cfg);
+      added++;
+    }
+    if (!added) alert('Не найдено валидных конфигов серверов');
+  }
+
+  function exportMcpJson() {
+    const out = { mcpServers: {} };
+    for (const s of MCPRegistry.servers) {
+      const c = s.config;
+      if (c.transport === 'stdio') {
+        out.mcpServers[c.name] = { command: c.command, args: c.args || [], env: c.env || {} };
+      } else {
+        out.mcpServers[c.name] = { type: c.transport, url: c.url, headers: c.headers || {} };
+      }
+    }
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mcp.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function bindEvents() {
+    document.getElementById('mcpAddServerBtn')?.addEventListener('click', () => openAddDialog());
+    document.getElementById('mcpImportJsonBtn')?.addEventListener('click', () => document.getElementById('mcpImportJsonFile').click());
+    document.getElementById('mcpImportJsonFile')?.addEventListener('change', (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = () => importMcpJson(r.result);
+      r.readAsText(f);
+      e.target.value = '';
+    });
+    document.getElementById('mcpExportJsonBtn')?.addEventListener('click', exportMcpJson);
+    document.getElementById('mcpReconnectAllBtn')?.addEventListener('click', () => MCPRegistry.connectAll());
+    document.getElementById('mcpBridgeHelp')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      alert('Чтобы запустить локальный мост:\n\n  cd bridge\n  npm install\n  npm start\n\nМост слушает ws://127.0.0.1:7777 и проксирует stdio MCP-серверы (npx @modelcontextprotocol/server-filesystem и т.п.).');
+    });
+
+    document.getElementById('mcpServersList')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-server-id]');
+      if (!btn) return;
+      const id = btn.dataset.serverId;
+      if (btn.matches('[data-mcp-reconnect]')) MCPRegistry.connect(id);
+      else if (btn.matches('[data-mcp-delete]')) { if (confirm('Удалить сервер?')) MCPRegistry.removeServer(id); }
+      else if (btn.matches('[data-mcp-edit]')) openAddDialog(id);
+    });
+    document.getElementById('mcpServersList')?.addEventListener('change', (e) => {
+      if (e.target.matches('[data-mcp-server-toggle]')) {
+        MCPRegistry.toggleServer(e.target.dataset.serverId, e.target.checked);
+      } else if (e.target.matches('[data-mcp-tool-toggle]')) {
+        MCPRegistry.toggleTool(e.target.dataset.serverId, e.target.dataset.toolName, e.target.checked);
+      }
+    });
+  }
+
+  async function init() {
+    bindEvents();
+    MCPRegistry.load();
+    MCPRegistry.on(rerender);
+    rerender();
+    // Стартуем подключение в фоне
+    MCPRegistry.connectAll().catch(() => {});
+  }
+
+  return { init, rerender };
+})();
+
+document.addEventListener('DOMContentLoaded', () => { try { MCPUI.init(); } catch (e) { console.error('[MCP-UI]', e); } });
 
 /* ========= SETTINGS ACCORDION ========= */
 (function initSettingsAccordion() {
