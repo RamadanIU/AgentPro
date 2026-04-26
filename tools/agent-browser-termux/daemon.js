@@ -101,11 +101,18 @@ function ensureBrowser() {
 async function _ensureBrowserInner() {
   if (browser && browser.isConnected && browser.isConnected() && pages.length) return;
 
-  // Match exactly the args the user's tested ~/playwright-termux skill uses.
-  // Anything beyond these three has historically broken Termux Chromium
+  // Match the args from the user's tested ~/playwright-termux skill, plus
+  // --disable-web-security which the same skill explicitly recommends as the
+  // remedy for `net::ERR_ABORTED` during page.goto on Termux Chromium 138.
+  // Anything beyond these has historically broken Termux Chromium
   // (e.g. --no-zygote, --disable-features=site-per-process).
   // Extra args can be added via AGENT_BROWSER_EXTRA_ARGS env var (space-separated).
-  const baseArgs = ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'];
+  const baseArgs = [
+    '--no-sandbox',
+    '--disable-gpu',
+    '--disable-dev-shm-usage',
+    '--disable-web-security',
+  ];
   const extra = (process.env.AGENT_BROWSER_EXTRA_ARGS || '').trim().split(/\s+/).filter(Boolean);
   const launchOpts = {
     headless: HEADLESS,
@@ -419,15 +426,18 @@ COMMANDS.open = async (argv) => {
   const { flags, positional } = parseFlags(argv);
   const url = positional[0];
   if (!url) throw new Error('open: url required');
-  const waitUntil = flags.wait || 'load';
+  // Termux Chromium often never reaches the 'load' state on heavy SPAs
+  // (the user's skill explicitly recommends domcontentloaded); use that
+  // as the default and let callers override with --wait.
+  const waitUntil = flags.wait || 'domcontentloaded';
   await activePage().goto(url, { waitUntil, timeout: DEFAULT_TIMEOUT });
   await persistStorage();
   return { stdout: activePage().url() + '\n', stderr: '', exit_code: 0 };
 };
 
-COMMANDS.back     = async () => { await ensureBrowser(); await activePage().goBack({ waitUntil: 'load' }).catch(()=>{}); return {stdout:activePage().url()+'\n',stderr:'',exit_code:0};};
-COMMANDS.forward  = async () => { await ensureBrowser(); await activePage().goForward({ waitUntil: 'load' }).catch(()=>{}); return {stdout:activePage().url()+'\n',stderr:'',exit_code:0};};
-COMMANDS.reload   = async () => { await ensureBrowser(); await activePage().reload({ waitUntil: 'load' }); return {stdout:activePage().url()+'\n',stderr:'',exit_code:0};};
+COMMANDS.back     = async () => { await ensureBrowser(); await activePage().goBack({ waitUntil: 'domcontentloaded' }).catch(()=>{}); return {stdout:activePage().url()+'\n',stderr:'',exit_code:0};};
+COMMANDS.forward  = async () => { await ensureBrowser(); await activePage().goForward({ waitUntil: 'domcontentloaded' }).catch(()=>{}); return {stdout:activePage().url()+'\n',stderr:'',exit_code:0};};
+COMMANDS.reload   = async () => { await ensureBrowser(); await activePage().reload({ waitUntil: 'domcontentloaded' }); return {stdout:activePage().url()+'\n',stderr:'',exit_code:0};};
 
 COMMANDS.set = async (argv) => {
   await ensureBrowser();
@@ -609,7 +619,7 @@ COMMANDS.tabs = async (argv) => {
     const np = await context.newPage();
     pages.push(np);
     activeIndex = pages.length - 1;
-    if (argv[1]) await np.goto(argv[1], { waitUntil: 'load' });
+    if (argv[1]) await np.goto(argv[1], { waitUntil: 'domcontentloaded' });
     return { stdout: 'tab ' + activeIndex + '\n', stderr: '', exit_code: 0 };
   }
   if (sub === 'switch') {
