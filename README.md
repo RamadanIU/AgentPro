@@ -8,15 +8,25 @@
 | **Workspace API** (`wsapi_server.py`, Flask) | Файловая система агента (`/ws/list`, `/ws/read`, `/ws/write`, …) | <http://localhost:8764> |
 | **Terminal Server** (`server.js`, Node + node-pty) | Удалённый PTY и одноразовые команды для агента | `ws://localhost:8765/term`, `ws://localhost:8765/exec` |
 | **MCP stdio Bridge** (`bridge/agent-pro-bridge.mjs`) | Локальный мост, чтобы браузер мог запускать stdio-MCP-серверы | `ws://127.0.0.1:7777` |
+| **agent-browser** (CLI, `tools/agent-browser-termux/`) | Persistent Playwright-Chromium для `browser_action` в чате | `~/.local/bin/agent-browser` (или `$PREFIX/bin` на Termux) |
 
-Раньше эти четыре процесса нужно было запускать руками в разных терминалах. Теперь
-после клона репозитория всё стартует **одной командой**.
+Раньше эти процессы нужно было запускать руками в разных терминалах, плюс отдельно
+ставить agent-browser shim. Теперь после клона репозитория всё стартует **одной
+командой**.
 
 ---
 
 ## Быстрый старт (одна команда)
 
-Требования: **Node.js ≥ 18**, **Python ≥ 3.9**, `npm`, `pip`.
+Требования:
+
+* **Node.js ≥ 18** (для `node-pty`, `playwright-core`).
+* **Python ≥ 3.9** с модулями `venv` и `ensurepip` (на Ubuntu/Debian — пакеты
+  `python3-venv` и `python3-pip`; на Termux — `python`).
+* **npm** (идёт в комплекте с Node.js).
+* **Chromium** или **Google Chrome** в `$PATH` (нужен для `agent-browser`; на Ubuntu —
+  `sudo apt install chromium-browser`, на Termux — `pkg install chromium-browser`).
+  Без него все остальные сервисы поднимутся, но `browser_action` в чате будет падать.
 
 ```bash
 git clone https://github.com/RamadanIU/Chat.git
@@ -32,13 +42,38 @@ npm start
 
 Скрипт `start.sh`:
 
-1. Проверит наличие `node`, `npm`, `python3`.
+1. Определит окружение (Termux или обычный Linux/macOS) и проверит `node`, `npm`,
+   `python3`, версию Node ≥ 18, наличие `python3-venv`/`ensurepip`. На любую
+   проблему — печатает понятное сообщение с командой для исправления.
 2. Создаст `.venv/` и поставит `flask`, `flask-cors` (для Workspace API).
-3. Поставит Node-зависимости в корне (`ws`, `node-pty`) и в `bridge/`.
-4. Запустит **все четыре сервиса** через оркестратор `run.py`.
+3. Поставит Node-зависимости в корне (`ws`, `node-pty`) и в `bridge/`. Если
+   `node-pty` не собрался — подсказывает, какой `build-essential` поставить.
+4. Установит **agent-browser** (`tools/agent-browser-termux/install.sh`):
+   создаст `~/playwright-termux/`, поставит туда `playwright-core`, разложит
+   `daemon.js` / `cli.js` и положит обёртку `agent-browser` в `~/.local/bin`.
+   Этот шаг можно отключить флагом `--no-browser`.
+5. Запустит **все четыре сервиса** через оркестратор `run.py`.
+
+### Флаги
+
+* `bash start.sh --no-browser` — пропустить установку agent-browser shim
+  (если в чате не нужен `browser_action`).
+* `bash start.sh --skip-deps` — не ставить ничего, только запустить (после
+  первой успешной установки).
+* `bash start.sh --help` — показать встроенную справку.
 
 После запуска откройте в браузере <http://localhost:8080> — это и есть UI чата.
 Завершить всё — `Ctrl+C` в том же терминале.
+
+### Системные пакеты, если что-то упало
+
+| Симптом | Решение |
+| --- | --- |
+| `python3 -m venv` падает с `ensurepip is not available` | `sudo apt install python3-venv python3-pip` |
+| `npm install` падает на `node-pty` (`gyp ERR!`) | `sudo apt install build-essential python3 make g++` (Termux: `pkg install build-essential python make`) |
+| `agent-browser open …` → `Could not load playwright-core` | Запустите `bash start.sh` ещё раз без `--no-browser`, либо вручную `bash tools/agent-browser-termux/install.sh`. |
+| `agent-browser open …` → `Failed to launch chromium` | Поставьте Chromium: Ubuntu — `sudo apt install chromium-browser`, Termux — `pkg install chromium-browser`. |
+| Termux: всё стало, но Chromium не запускается | Прочтите [`tools/agent-browser-termux/README.md`](tools/agent-browser-termux/README.md) — там описаны флаги `AGENT_BROWSER_SINGLE_PROCESS`, `AGENT_BROWSER_HEADLESS`. |
 
 ### Что увидите в логе
 
@@ -105,6 +140,11 @@ node server.js                       # PORT=8765 по умолчанию
 
 # 4. Frontend (любой статический сервер)
 python3 -m http.server 8080
+
+# 5. agent-browser shim
+bash tools/agent-browser-termux/install.sh   # ставит CLI и playwright-core
+agent-browser version                        # проверка
+agent-browser kill                           # остановить демон
 ```
 
 ---
@@ -119,7 +159,7 @@ python3 -m http.server 8080
 ├── bridge/                 # MCP stdio bridge (Node)
 │   ├── agent-pro-bridge.mjs
 │   └── README.md
-├── tools/agent-browser-termux/  # CLI-шим agent-browser для Termux
+├── tools/agent-browser-termux/  # CLI-шим agent-browser (Playwright + Chromium)
 ├── run.py                  # оркестратор всех сервисов
 ├── start.sh                # установка зависимостей + run.py
 ├── requirements.txt        # Python-зависимости
