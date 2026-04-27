@@ -78,6 +78,12 @@ def banner() -> None:
     log("system", f"Workspace API  : http://localhost:{WORKSPACE_PORT}/ws/ping")
     log("system", f"Terminal (ws)  : ws://localhost:{TERM_PORT}/term  | /exec")
     log("system", f"MCP bridge (ws): ws://{BRIDGE_HOST}:{BRIDGE_PORT}")
+    ab = shutil.which("agent-browser")
+    if ab:
+        log("system", f"agent-browser  : {ab} (browser_action в чате готов)")
+    else:
+        log("system", "agent-browser  : НЕ установлен — browser_action будет падать.")
+        log("system", "                 (поставьте через bash start.sh либо tools/agent-browser-termux/install.sh)")
     log("system", "─" * 64)
     log("system", "Открой Frontend в браузере и в Settings укажи адреса выше.")
     log("system", "Ctrl+C — остановить все сервисы.")
