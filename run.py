@@ -51,7 +51,11 @@ TERM_PORT = int(os.environ.get("TERM_PORT", "8765"))
 BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "7777"))
 
 HOST = os.environ.get("HOST", "0.0.0.0")
-BRIDGE_HOST = os.environ.get("AGENT_PRO_BRIDGE_HOST", "127.0.0.1")
+# Бридж по умолчанию слушает на том же интерфейсе, что и terminal/workspace,
+# чтобы быть доступным из браузера, открытого на другом устройстве (телефон,
+# другой комп в LAN, туннель). Если нужно жёстко ограничить только локалхостом —
+# задайте AGENT_PRO_BRIDGE_HOST=127.0.0.1 (или HOST=127.0.0.1 для всех сервисов).
+BRIDGE_HOST = os.environ.get("AGENT_PRO_BRIDGE_HOST", HOST)
 
 # ── HTTP Basic Auth для frontend ─────────────────────────────────────────────
 # Дефолтные креды по просьбе владельца проекта; меняются через env. Чтобы
@@ -91,7 +95,8 @@ def banner() -> None:
     log("system", f"Frontend       : http://localhost:{FRONTEND_PORT}")
     log("system", f"Workspace API  : http://localhost:{WORKSPACE_PORT}/ws/ping")
     log("system", f"Terminal (ws)  : ws://localhost:{TERM_PORT}/term  | /exec")
-    log("system", f"MCP bridge (ws): ws://{BRIDGE_HOST}:{BRIDGE_PORT}")
+    bridge_display = BRIDGE_HOST if BRIDGE_HOST not in ("0.0.0.0", "::", "") else "localhost"
+    log("system", f"MCP bridge (ws): ws://{bridge_display}:{BRIDGE_PORT}")
     ab = shutil.which("agent-browser")
     if ab:
         log("system", f"agent-browser  : {ab} (browser_action в чате готов)")
@@ -179,10 +184,17 @@ def _runtime_config_payload(host_for_browser: str) -> dict:
     в настройках, чтобы из коробки работало подключение на ws://<host>:<TERM_PORT>
     и http://<host>:<WORKSPACE_PORT> без ручного ввода.
     """
+    # Если бридж жёстко привязан к loopback (AGENT_PRO_BRIDGE_HOST=127.0.0.1) —
+    # отдаём его как есть; иначе строим URL относительно того хоста, по которому
+    # пришёл запрос на frontend (так же, как для terminal/workspace).
+    if BRIDGE_HOST in ("", "0.0.0.0", "::"):
+        bridge_url = f"ws://{host_for_browser}:{BRIDGE_PORT}"
+    else:
+        bridge_url = f"ws://{BRIDGE_HOST}:{BRIDGE_PORT}"
     return {
         "termUrl": f"ws://{host_for_browser}:{TERM_PORT}",
         "wsApiUrl": f"http://{host_for_browser}:{WORKSPACE_PORT}",
-        "bridgeUrl": f"ws://{BRIDGE_HOST}:{BRIDGE_PORT}",
+        "bridgeUrl": bridge_url,
         "termPort": TERM_PORT,
         "wsApiPort": WORKSPACE_PORT,
         "bridgePort": BRIDGE_PORT,

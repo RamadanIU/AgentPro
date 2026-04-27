@@ -8675,8 +8675,24 @@ const toolImpl = {
  * ════════════════════════════════════════════════════════════════════════════ */
 
 const MCP_PROTOCOL_VERSION = '2024-11-05';
-const MCP_BRIDGE_URL = 'ws://127.0.0.1:7777';
-const MCP_BRIDGE_HEALTH = 'http://127.0.0.1:7777/health';
+
+/** URL локального stdio-моста: берём из window.AGENT_PRO_DEFAULTS (run.py
+ *  подставляет туда хост, по которому открыт frontend, чтобы мост работал
+ *  и при удалённом доступе — телефон, LAN, туннель). Fallback — 127.0.0.1. */
+function _mcpBridgeWsUrl() {
+  try {
+    const u = (window.AGENT_PRO_DEFAULTS || {}).bridgeUrl;
+    if (typeof u === 'string' && u) return u;
+  } catch {}
+  return 'ws://127.0.0.1:7777';
+}
+function _mcpBridgeHealthUrl() {
+  // ws://host:port → http(s)://host:port/health
+  const ws = _mcpBridgeWsUrl();
+  return ws.replace(/^ws:/, 'http:').replace(/^wss:/, 'https:').replace(/\/+$/, '') + '/health';
+}
+const MCP_BRIDGE_URL = _mcpBridgeWsUrl();
+const MCP_BRIDGE_HEALTH = _mcpBridgeHealthUrl();
 
 /** Проверка доступности локального моста для stdio-серверов */
 async function checkMCPBridge() {
@@ -8858,11 +8874,16 @@ class MCPClient {
       } else {
         throw new Error('Неизвестный транспорт: ' + t);
       }
+      // Для stdio первая инициализация может включать `npx -y ...` (скачивание
+      // пакета и его deps), что у крупных серверов вроде desktop-commander
+      // легко занимает > 30 с на чистом окружении. Даём щедрый таймаут только
+      // на initialize; обычные tools/call по-прежнему ограничены 30 с.
+      const initTimeout = (t === 'stdio') ? 180000 : 30000;
       const init = await this._request('initialize', {
         protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: { tools: {} },
         clientInfo: { name: 'AgentPro', version: '1.0.0' }
-      });
+      }, initTimeout);
       this.serverInfo = init?.serverInfo || null;
       this.capabilities = init?.capabilities || null;
       // Уведомление о готовности
@@ -15203,12 +15224,13 @@ const MCPUI = (() => {
     const ind = document.getElementById('mcpBridgeIndicator');
     const txt = document.getElementById('mcpBridgeText');
     if (!ind || !txt) return;
+    const url = escapeHtml(MCP_BRIDGE_URL);
     if (MCPRegistry.bridgeAvailable) {
       ind.style.background = 'var(--success)';
-      txt.innerHTML = 'Локальный мост (stdio): <b style="color:var(--success);">подключён</b> на <code>ws://127.0.0.1:7777</code>';
+      txt.innerHTML = 'Локальный мост (stdio): <b style="color:var(--success);">подключён</b> на <code>' + url + '</code>';
     } else {
       ind.style.background = 'var(--text-3)';
-      txt.innerHTML = 'Локальный мост (stdio): не запущен. <span style="color:var(--text-2);">stdio-серверы недоступны.</span>';
+      txt.innerHTML = 'Локальный мост (stdio): не запущен на <code>' + url + '</code>. <span style="color:var(--text-2);">stdio-серверы недоступны.</span>';
     }
   }
 
@@ -15333,7 +15355,7 @@ const MCPUI = (() => {
             <label style="font-size:11px;color:var(--text-1);font-weight:600;">Команда <input data-f="command" class="input-modern" value="${escapeHtml(cfg.command || '')}" placeholder="npx" style="margin-top:4px;width:100%;" /></label>
             <label style="font-size:11px;color:var(--text-1);font-weight:600;">Аргументы (по строке на каждый) <textarea data-f="args" class="input-modern" rows="3" placeholder="-y&#10;@modelcontextprotocol/server-filesystem&#10;/path/to/dir" style="margin-top:4px;width:100%;font-family:var(--font-mono);font-size:11px;">${escapeHtml((cfg.args || []).join('\n'))}</textarea></label>
             <label style="font-size:11px;color:var(--text-1);font-weight:600;">Переменные окружения (JSON, опционально) <textarea data-f="env" class="input-modern" rows="2" placeholder='{"FOO":"bar"}' style="margin-top:4px;width:100%;font-family:var(--font-mono);font-size:11px;">${escapeHtml(JSON.stringify(cfg.env || {}, null, 2))}</textarea></label>
-            <div style="font-size:10px;color:var(--text-2);">Требуется запущенный <code>agent-pro-bridge</code> на <code>ws://127.0.0.1:7777</code>.</div>
+            <div style="font-size:10px;color:var(--text-2);">Требуется запущенный <code>agent-pro-bridge</code> на <code>${escapeHtml(MCP_BRIDGE_URL)}</code>.</div>
           </div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
@@ -15433,7 +15455,7 @@ const MCPUI = (() => {
     document.getElementById('mcpReconnectAllBtn')?.addEventListener('click', () => MCPRegistry.connectAll());
     document.getElementById('mcpBridgeHelp')?.addEventListener('click', (e) => {
       e.preventDefault();
-      alert('Чтобы запустить локальный мост:\n\n  cd bridge\n  npm install\n  npm start\n\nМост слушает ws://127.0.0.1:7777 и проксирует stdio MCP-серверы (npx @modelcontextprotocol/server-filesystem и т.п.).');
+      alert('Чтобы запустить локальный мост:\n\n  cd bridge\n  npm install\n  npm start\n\nМост слушает ' + MCP_BRIDGE_URL + ' и проксирует stdio MCP-серверы (npx @modelcontextprotocol/server-filesystem и т.п.).\n\nЕсли стек уже запущен через start.sh — мост поднимается автоматически вместе с остальными сервисами.');
     });
 
     document.getElementById('mcpServersList')?.addEventListener('click', (e) => {
@@ -15460,6 +15482,26 @@ const MCPUI = (() => {
     rerender();
     // Стартуем подключение в фоне
     MCPRegistry.connectAll().catch(() => {});
+    // Фоновая проверка моста: если он стартует чуть позже фронта (или его
+    // временно перезапустили) — индикатор автоматически перейдёт в «подключён»
+    // и пользователю не надо жать «Reconnect All» вручную.
+    setInterval(async () => {
+      try {
+        const before = MCPRegistry.bridgeAvailable;
+        const checks = await checkMCPBridge();
+        if (before !== checks.available) {
+          MCPRegistry.bridgeAvailable = checks.available;
+          MCPRegistry._emit();
+          // Появился мост — попробуем поднять stdio-серверы автоматически.
+          if (checks.available) {
+            const stdioStale = MCPRegistry.servers.filter(
+              s => s.enabled && s.config.transport === 'stdio' && s.status !== 'ready'
+            );
+            for (const s of stdioStale) MCPRegistry.connect(s.id).catch(() => {});
+          }
+        }
+      } catch {}
+    }, 5000);
   }
 
   return { init, rerender };
