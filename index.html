@@ -16085,28 +16085,9 @@ const MCPUI = (() => {
     MCPRegistry.load();
     MCPRegistry.on(rerender);
     rerender();
-    // Стартуем подключение в фоне
+    // Разовая проверка моста + connect всех включённых серверов.
+    // Переподключение — только вручную через «Reconnect All» / иконку у сервера.
     MCPRegistry.connectAll().catch(() => {});
-    // Фоновая проверка моста: если он стартует чуть позже фронта (или его
-    // временно перезапустили) — индикатор автоматически перейдёт в «подключён»
-    // и пользователю не надо жать «Reconnect All» вручную.
-    setInterval(async () => {
-      try {
-        const before = MCPRegistry.bridgeAvailable;
-        const checks = await checkMCPBridge();
-        if (before !== checks.available) {
-          MCPRegistry.bridgeAvailable = checks.available;
-          MCPRegistry._emit();
-          // Появился мост — попробуем поднять stdio-серверы автоматически.
-          if (checks.available) {
-            const stdioStale = MCPRegistry.servers.filter(
-              s => s.enabled && s.config.transport === 'stdio' && s.status !== 'ready'
-            );
-            for (const s of stdioStale) MCPRegistry.connect(s.id).catch(() => {});
-          }
-        }
-      } catch {}
-    }, 5000);
   }
 
   return { init, rerender };
