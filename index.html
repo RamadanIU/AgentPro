@@ -4718,6 +4718,7 @@ button:disabled, .icon-btn:disabled, input:disabled, textarea:disabled {
             <label>Провайдер</label>
             <select id="provider" class="input-modern">
               <option value="openai">OpenAI</option>
+              <option value="nvidia">NVIDIA NIM (build.nvidia.com)</option>
               <option value="openrouter">OpenRouter</option>
               <option value="groq">Groq</option>
               <option value="mistral">Mistral AI</option>
@@ -4900,6 +4901,63 @@ button:disabled, .icon-btn:disabled, input:disabled, textarea:disabled {
               Порт по умолчанию: <code>5001</code>. Укажите IP/домен сервера.<br>
               Пример: <code>http://192.168.1.100:5001</code><br>
               API ключ — из вашего <code>config.json</code> (поле <code>keys</code>).
+            </div>
+          </div>
+
+          <!-- NVIDIA NIM (build.nvidia.com) settings -->
+          <div class="settings-group" id="nvidiaSettingsGroup" style="display:none;">
+            <label style="display:flex;align-items:center;gap:6px;">
+              <i data-lucide="server-cog" style="width:14px;height:14px;color:var(--text-2);"></i>
+              NVIDIA Base URL
+            </label>
+            <input id="nvidiaBase" type="text" placeholder="https://integrate.api.nvidia.com/v1" />
+            <div style="margin-top:5px;display:flex;gap:6px;align-items:center;">
+              <button id="nvidiaTestBtn" style="flex:1;padding:6px 10px;border-radius:var(--r-md);border:1px solid var(--border-focus);background:var(--bg-3);color:var(--text-0);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;justify-content:center;gap:5px;">
+                <i data-lucide="wifi" style="width:12px;height:12px;"></i> Проверить ключ
+              </button>
+              <span id="nvidiaTestStatus" style="font-size:11px;color:var(--text-2);"></span>
+            </div>
+
+            <!-- NVIDIA Reasoning Mode (для R1 / Nemotron-Reasoning / QwQ) -->
+            <div style="margin-top:10px;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-1);margin-bottom:6px;">
+                <i data-lucide="brain" style="width:14px;height:14px;color:var(--text-2);"></i>
+                Режим размышлений (reasoning_content)
+              </label>
+              <div class="toggle-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="nvidiaShowThinking" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label">Показывать цепочку рассуждений</span>
+              </div>
+              <div style="margin-top:4px;font-size:10px;color:var(--text-2);line-height:1.4;">
+                Для reasoning-моделей (<code>deepseek-r1</code>, <code>nemotron</code>, <code>qwq</code>, <code>gpt-oss</code> и др.) — блок <code>reasoning_content</code> отображается как «размышление» перед ответом.
+              </div>
+            </div>
+
+            <!-- NVIDIA Streaming (опционально) -->
+            <div style="margin-top:10px;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-1);margin-bottom:6px;">
+                <i data-lucide="zap" style="width:14px;height:14px;color:var(--text-2);"></i>
+                Стриминг ответов
+              </label>
+              <div class="toggle-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="nvidiaStream">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label">stream=true (быстрее «время до первого токена»)</span>
+              </div>
+              <div style="margin-top:4px;font-size:10px;color:var(--text-2);line-height:1.4;">
+                Включает потоковую передачу. Если включено — ответ собирается из <code>data:</code> SSE-чанков. Tools работают, но некоторые модели не поддерживают streaming — выключите при ошибках.
+              </div>
+            </div>
+
+            <div style="margin-top:10px;padding:8px;background:var(--info-bg);border:1px solid rgba(118,185,0,0.22);border-radius:var(--r-sm);font-size:11px;color:var(--text-1);line-height:1.6;">
+              💚 <b>NVIDIA NIM API</b> — бесплатный доступ к топ-моделям (Llama, Nemotron, DeepSeek-R1, Qwen, Mistral, Gemma, Phi и др.).<br>
+              Получите ключ <code>nvapi-...</code> на <a href="https://build.nvidia.com" target="_blank" rel="noopener" style="color:var(--accent);">build.nvidia.com</a> → <i>Get API Key</i>.<br>
+              Endpoint OpenAI-совместимый (<code>/v1/chat/completions</code>, <code>/v1/models</code>) — можно подменить Base URL на свой self-hosted NIM.
             </div>
           </div>
 
@@ -5785,6 +5843,47 @@ const KNOWN_CONTEXT_WINDOWS = {
   'glm-4-flash': 128000, 'glm-4-long': 1000000, 'glm-zero-preview': 128000,
   'glm-4-think': 128000, 'glm-4-zero': 128000,
   'glm-4-air': 128000, 'glm-4-airx': 8192, 'glm-3-turbo': 8192,
+  // NVIDIA NIM models (build.nvidia.com)
+  'meta/llama-3.3-70b-instruct': 131072, 'meta/llama-3.1-405b-instruct': 131072,
+  'meta/llama-3.1-70b-instruct': 131072, 'meta/llama-3.1-8b-instruct': 131072,
+  'meta/llama3-70b-instruct': 8192, 'meta/llama3-8b-instruct': 8192,
+  'meta/llama-4-maverick-17b-128e-instruct': 1048576,
+  'meta/llama-4-scout-17b-16e-instruct': 1048576,
+  'nvidia/llama-3.3-nemotron-super-49b-v1': 131072,
+  'nvidia/llama-3.1-nemotron-70b-instruct': 131072,
+  'nvidia/llama-3.1-nemotron-ultra-253b-v1': 131072,
+  'nvidia/llama-3.1-nemotron-nano-8b-v1': 131072,
+  'nvidia/nemotron-nano-9b-v2': 131072,
+  'nvidia/nemotron-3-nano-30b-a3b': 1048576,
+  'nvidia/cosmos-reason1-7b': 8192, 'nvidia/cosmos-reason2-8b': 8192,
+  'deepseek-ai/deepseek-r1': 131072,
+  'deepseek-ai/deepseek-r1-distill-llama-70b': 131072,
+  'deepseek-ai/deepseek-r1-distill-qwen-32b': 131072,
+  'deepseek-ai/deepseek-r1-distill-qwen-14b': 131072,
+  'deepseek-ai/deepseek-r1-distill-qwen-7b': 131072,
+  'deepseek-ai/deepseek-v3': 131072, 'deepseek-ai/deepseek-v3-0324': 131072,
+  'mistralai/mistral-large-2-instruct': 128000, 'mistralai/mistral-large': 128000,
+  'mistralai/mixtral-8x22b-instruct-v0.1': 64000,
+  'mistralai/mixtral-8x7b-instruct-v0.1': 32768,
+  'mistralai/codestral-22b-instruct-v0.1': 32768,
+  'mistralai/mistral-7b-instruct-v0.3': 32768,
+  'mistralai/mistral-medium-3-instruct': 128000,
+  'qwen/qwen2.5-coder-32b-instruct': 32768, 'qwen/qwen2.5-7b-instruct': 32768,
+  'qwen/qwq-32b': 131072, 'qwen/qwen3-coder-480b-a35b-instruct': 262144,
+  'google/gemma-3-27b-it': 131072, 'google/gemma-3-12b-it': 131072,
+  'google/gemma-2-27b-it': 8192, 'google/gemma-2-9b-it': 8192,
+  'microsoft/phi-3-medium-128k-instruct': 128000,
+  'microsoft/phi-3.5-moe-instruct': 131072,
+  'microsoft/phi-3.5-mini-instruct': 131072,
+  'microsoft/phi-3-small-128k-instruct': 128000,
+  'microsoft/phi-3.5-vision-instruct': 131072,
+  'openai/gpt-oss-20b': 131072, 'openai/gpt-oss-120b': 131072,
+  'writer/palmyra-creative-122b': 131072, 'writer/palmyra-fin-70b-32k': 32768,
+  'writer/palmyra-med-70b-32k': 32768,
+  'ibm/granite-3.0-8b-instruct': 4096, 'ibm/granite-3.0-3b-a800m-instruct': 4096,
+  'nv-mistralai/mistral-nemo-12b-instruct': 131072,
+  '01-ai/yi-large': 32768,
+  'abacusai/dracarys-llama-3.1-70b-instruct': 32768,
 };
 
 function guessContextWindow(modelId) {
@@ -5886,6 +5985,11 @@ function saveSettings() {
   const deepseekBase = (document.getElementById('deepseekBase').value || '').trim();
   if (deepseekBase) localStorage.setItem('agent_deepseek_base', deepseekBase);
   localStorage.setItem('agent_deepseek_show_thinking', document.getElementById('deepseekShowThinking').checked.toString());
+  // NVIDIA NIM base URL + reasoning + streaming toggles
+  const nvidiaBase = (document.getElementById('nvidiaBase').value || '').trim();
+  if (nvidiaBase) localStorage.setItem('agent_nvidia_base', nvidiaBase);
+  localStorage.setItem('agent_nvidia_show_thinking', document.getElementById('nvidiaShowThinking').checked.toString());
+  localStorage.setItem('agent_nvidia_stream', document.getElementById('nvidiaStream').checked.toString());
   document.dispatchEvent(new CustomEvent('settings:saved'));
 }
 function getCurrentKey() {
@@ -5913,6 +6017,8 @@ function updateKeyIndicator() {
     input.style.borderColor = 'var(--border)';
     if (provider === 'deepseek') {
       input.placeholder = 'API ключ из config.json (ds2api)';
+    } else if (provider === 'nvidia') {
+      input.placeholder = 'nvapi-...';
     } else {
       input.placeholder = 'Вставьте ключ';
     }
@@ -5938,6 +6044,7 @@ function loadSettings() {
   const isPuter = document.getElementById('provider').value === 'puter';
   const isQwen = document.getElementById('provider').value === 'qwen';
   const isDeepSeek = document.getElementById('provider').value === 'deepseek';
+  const isNvidia = document.getElementById('provider').value === 'nvidia';
   document.getElementById('apiKeyGroup').style.display = isPuter ? 'none' : '';
   document.getElementById('puterAuthGroup').style.display = isPuter ? '' : 'none';
   document.getElementById('qwenBaseGroup').style.display = isQwen ? '' : 'none';
@@ -5947,6 +6054,7 @@ function loadSettings() {
   document.getElementById('qwenImageEditGroup').style.display = isQwen ? '' : 'none';
   document.getElementById('qwenVideoGenGroup').style.display = isQwen ? '' : 'none';
   document.getElementById('qwenDeleteChatsGroup').style.display = isQwen ? '' : 'none';
+  document.getElementById('nvidiaSettingsGroup').style.display = isNvidia ? '' : 'none';
   // Qwen AI Kit settings
   const savedQwenBase = localStorage.getItem('agent_qwen_base') || 'https://qwen.aikit.club';
   document.getElementById('qwenBase').value = savedQwenBase;
@@ -5959,6 +6067,11 @@ function loadSettings() {
   const savedDeepSeekBase = localStorage.getItem('agent_deepseek_base') || '';
   document.getElementById('deepseekBase').value = savedDeepSeekBase;
   document.getElementById('deepseekShowThinking').checked = localStorage.getItem('agent_deepseek_show_thinking') !== 'false';
+  // NVIDIA NIM settings
+  const savedNvidiaBase = localStorage.getItem('agent_nvidia_base') || 'https://integrate.api.nvidia.com/v1';
+  document.getElementById('nvidiaBase').value = savedNvidiaBase;
+  document.getElementById('nvidiaShowThinking').checked = localStorage.getItem('agent_nvidia_show_thinking') !== 'false';
+  document.getElementById('nvidiaStream').checked = localStorage.getItem('agent_nvidia_stream') === 'true';
   if (!isPuter) {
     const key = getCurrentKey();
     document.getElementById('apiKey').value = key;
@@ -6034,6 +6147,7 @@ document.getElementById('provider').addEventListener('change', () => {
   const isPuter = provider === 'puter';
   const isQwen = provider === 'qwen';
   const isDeepSeek = provider === 'deepseek';
+  const isNvidia = provider === 'nvidia';
   document.getElementById('apiKeyGroup').style.display = isPuter ? 'none' : '';
   document.getElementById('puterAuthGroup').style.display = isPuter ? '' : 'none';
   document.getElementById('qwenBaseGroup').style.display = isQwen ? '' : 'none';
@@ -6044,6 +6158,7 @@ document.getElementById('provider').addEventListener('change', () => {
   document.getElementById('qwenVideoGenGroup').style.display = isQwen ? '' : 'none';
   document.getElementById('qwenDeleteChatsGroup').style.display = isQwen ? '' : 'none';
   document.getElementById('deepseekBaseGroup').style.display = isDeepSeek ? '' : 'none';
+  document.getElementById('nvidiaSettingsGroup').style.display = isNvidia ? '' : 'none';
   if (!isPuter) {
     const key = getCurrentKey();
     document.getElementById('apiKey').value = key;
@@ -6084,6 +6199,45 @@ document.getElementById('deepseekTestBtn').addEventListener('click', async () =>
       statusEl.textContent = '✗ Таймаут — сервер не отвечает';
     } else {
       statusEl.textContent = '✗ Недоступен — проверьте IP и порт';
+    }
+    statusEl.style.color = 'var(--error)';
+  }
+});
+
+// ═══════════ NVIDIA NIM — обработчики ═══════════
+document.getElementById('nvidiaBase').addEventListener('change', () => { saveSettings(); });
+document.getElementById('nvidiaShowThinking').addEventListener('change', saveSettings);
+document.getElementById('nvidiaStream').addEventListener('change', saveSettings);
+document.getElementById('nvidiaTestBtn').addEventListener('click', async () => {
+  const base = getNvidiaBase();
+  const key  = getCurrentKey();
+  const statusEl = document.getElementById('nvidiaTestStatus');
+  if (!key) { statusEl.textContent = '⚠ Введите nvapi-ключ'; statusEl.style.color = 'var(--warning)'; return; }
+  if (!base) { statusEl.textContent = '⚠ Укажите Base URL'; statusEl.style.color = 'var(--warning)'; return; }
+  statusEl.textContent = '⏳ Проверка...'; statusEl.style.color = 'var(--text-2)';
+  try {
+    const res = await fetch(base + '/models', {
+      headers: { 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const count = (data.data || []).length;
+      statusEl.textContent = count > 0 ? `✓ Подключено (${count} моделей)` : '✓ Ключ валиден';
+      statusEl.style.color = 'var(--success)';
+      loadModels();
+    } else if (res.status === 401 || res.status === 403) {
+      statusEl.textContent = `✗ Невалидный ключ (HTTP ${res.status})`;
+      statusEl.style.color = 'var(--error)';
+    } else {
+      statusEl.textContent = `✗ HTTP ${res.status}`;
+      statusEl.style.color = 'var(--error)';
+    }
+  } catch (e) {
+    if (e.name === 'TimeoutError' || (e.message || '').includes('timeout')) {
+      statusEl.textContent = '✗ Таймаут — сервер не отвечает';
+    } else {
+      statusEl.textContent = '✗ Сеть недоступна';
     }
     statusEl.style.color = 'var(--error)';
   }
@@ -6588,6 +6742,8 @@ async function loadModels() {
       endpoint = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
     } else if (provider === 'qwen') {
       endpoint = getQwenBase() + '/v1/models';
+    } else if (provider === 'nvidia') {
+      endpoint = getNvidiaBase() + '/models';
     }
 
     // ⭐ Z.AI GLM: нет стандартного /models endpoint — используем известный список моделей
@@ -6601,6 +6757,93 @@ async function loadModels() {
         { id: 'glm-4.5-air', name: 'GLM-4.5-Air (128K)', context: 128000 },
         { id: 'glm-4-32b-0414-128k', name: 'GLM-4-32B-0414 (128K)', context: 128000 },
       ];
+    // ⭐ NVIDIA NIM: пробуем /models с nvapi-ключом, при ошибке — встроенный куратированный список
+    } else if (provider === 'nvidia') {
+      const nvBase = getNvidiaBase();
+      // Пробуем живой эндпоинт (нужен валидный ключ)
+      try {
+        if (key) {
+          const nvRes = await fetch(nvBase + '/models', {
+            headers: { 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (nvRes.ok) {
+            const nvData = await nvRes.json();
+            const raw = nvData.data || (Array.isArray(nvData) ? nvData : []);
+            if (raw.length > 0) {
+              models = raw
+                .filter(m => m && (m.id || typeof m === 'string'))
+                // Исключаем embedding/rerank/asr/tts из списка чат-моделей
+                .filter(m => {
+                  const id = (m.id || m).toLowerCase();
+                  return !/embed|rerank|whisper|riva|tts|guard|safety|nemoretriever/.test(id);
+                })
+                .map(m => ({
+                  id: m.id || m,
+                  name: m.id || m,
+                  context: m.context_length || m.context_window || guessContextWindow(m.id || m) || null,
+                }));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[NVIDIA] /models недоступен, используем встроенный список:', e.message);
+      }
+      // Fallback: курируемый список топовых моделей build.nvidia.com
+      if (models.length === 0) {
+        const nvFallback = [
+          // — NVIDIA Nemotron —
+          { id: 'nvidia/llama-3.3-nemotron-super-49b-v1',       name: 'Nemotron-Super-49B 🧠',          context: 131072 },
+          { id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1',     name: 'Nemotron-Ultra-253B 🧠',         context: 131072 },
+          { id: 'nvidia/llama-3.1-nemotron-70b-instruct',      name: 'Nemotron-70B-Instruct',              context: 131072 },
+          { id: 'nvidia/llama-3.1-nemotron-nano-8b-v1',        name: 'Nemotron-Nano-8B 🧠',            context: 131072 },
+          { id: 'nvidia/nemotron-nano-9b-v2',                  name: 'Nemotron-Nano-9B-v2 🧠',         context: 131072 },
+          { id: 'nvidia/nemotron-3-nano-30b-a3b',              name: 'Nemotron-3-Nano-30B (1M) 🧠',   context: 1048576 },
+          // — Meta Llama —
+          { id: 'meta/llama-4-maverick-17b-128e-instruct',     name: 'Llama-4-Maverick-17B (1M)',          context: 1048576 },
+          { id: 'meta/llama-4-scout-17b-16e-instruct',         name: 'Llama-4-Scout-17B (1M)',             context: 1048576 },
+          { id: 'meta/llama-3.3-70b-instruct',                 name: 'Llama-3.3-70B-Instruct',             context: 131072 },
+          { id: 'meta/llama-3.1-405b-instruct',                name: 'Llama-3.1-405B-Instruct',            context: 131072 },
+          { id: 'meta/llama-3.1-70b-instruct',                 name: 'Llama-3.1-70B-Instruct',             context: 131072 },
+          { id: 'meta/llama-3.1-8b-instruct',                  name: 'Llama-3.1-8B-Instruct',              context: 131072 },
+          // — DeepSeek —
+          { id: 'deepseek-ai/deepseek-r1',                     name: 'DeepSeek-R1 🧠',                  context: 131072 },
+          { id: 'deepseek-ai/deepseek-r1-distill-llama-70b',   name: 'R1-Distill-Llama-70B 🧠',        context: 131072 },
+          { id: 'deepseek-ai/deepseek-r1-distill-qwen-32b',    name: 'R1-Distill-Qwen-32B 🧠',         context: 131072 },
+          { id: 'deepseek-ai/deepseek-r1-distill-qwen-14b',    name: 'R1-Distill-Qwen-14B 🧠',         context: 131072 },
+          { id: 'deepseek-ai/deepseek-v3',                     name: 'DeepSeek-V3',                          context: 131072 },
+          // — Mistral —
+          { id: 'mistralai/mistral-large-2-instruct',          name: 'Mistral-Large-2-Instruct',            context: 128000 },
+          { id: 'mistralai/mixtral-8x22b-instruct-v0.1',       name: 'Mixtral-8x22B-Instruct',              context: 64000  },
+          { id: 'mistralai/mixtral-8x7b-instruct-v0.1',        name: 'Mixtral-8x7B-Instruct',               context: 32768  },
+          { id: 'mistralai/codestral-22b-instruct-v0.1',       name: 'Codestral-22B-Instruct',              context: 32768  },
+          { id: 'mistralai/mistral-7b-instruct-v0.3',          name: 'Mistral-7B-Instruct-v0.3',            context: 32768  },
+          { id: 'nv-mistralai/mistral-nemo-12b-instruct',      name: 'Mistral-Nemo-12B-Instruct',           context: 131072 },
+          // — Qwen —
+          { id: 'qwen/qwen3-coder-480b-a35b-instruct',         name: 'Qwen3-Coder-480B-A35B',               context: 262144 },
+          { id: 'qwen/qwq-32b',                                name: 'QwQ-32B 🧠',                      context: 131072 },
+          { id: 'qwen/qwen2.5-coder-32b-instruct',             name: 'Qwen2.5-Coder-32B',                   context: 32768  },
+          { id: 'qwen/qwen2.5-7b-instruct',                    name: 'Qwen2.5-7B-Instruct',                 context: 32768  },
+          // — OpenAI gpt-oss —
+          { id: 'openai/gpt-oss-120b',                         name: 'gpt-oss-120b 🧠',                  context: 131072 },
+          { id: 'openai/gpt-oss-20b',                          name: 'gpt-oss-20b 🧠',                   context: 131072 },
+          // — Google Gemma —
+          { id: 'google/gemma-3-27b-it',                       name: 'Gemma-3-27B-IT',                       context: 131072 },
+          { id: 'google/gemma-3-12b-it',                       name: 'Gemma-3-12B-IT',                       context: 131072 },
+          { id: 'google/gemma-2-27b-it',                       name: 'Gemma-2-27B-IT',                       context: 8192   },
+          { id: 'google/gemma-2-9b-it',                        name: 'Gemma-2-9B-IT',                        context: 8192   },
+          // — Microsoft Phi —
+          { id: 'microsoft/phi-3.5-moe-instruct',              name: 'Phi-3.5-MoE-Instruct',                 context: 131072 },
+          { id: 'microsoft/phi-3.5-mini-instruct',             name: 'Phi-3.5-Mini-Instruct',                context: 131072 },
+          { id: 'microsoft/phi-3.5-vision-instruct',           name: 'Phi-3.5-Vision-Instruct 📷',          context: 131072 },
+          { id: 'microsoft/phi-3-medium-128k-instruct',        name: 'Phi-3-Medium-128K',                   context: 128000 },
+          // — Writer / IBM / Yi —
+          { id: 'writer/palmyra-creative-122b',                name: 'Palmyra-Creative-122B',                context: 131072 },
+          { id: 'ibm/granite-3.0-8b-instruct',                 name: 'Granite-3.0-8B-Instruct',              context: 4096   },
+          { id: '01-ai/yi-large',                              name: 'Yi-Large',                             context: 32768  },
+        ];
+        models = nvFallback;
+      }
     // ⭐ DeepSeek Free (ds2api): пробуем /v1/models, при ошибке — встроенный список
     } else if (provider === 'deepseek') {
       const dsBase = (document.getElementById('deepseekBase').value.trim() || '').replace(/\/+$/, '');
@@ -6716,7 +6959,7 @@ async function loadModels() {
       setStatus('⚠️ Модели не найдены', 'error');
       return;
     }
-    if (provider === 'openrouter') {
+    if (provider === 'openrouter' || provider === 'nvidia') {
       const grouped = {};
       models.forEach(m => {
         const vendor = m.id.split('/')[0] || 'Другие';
@@ -6779,6 +7022,14 @@ async function loadModels() {
           || models.find(m => m.id.includes('max') || m.id.includes('Plus') || m.id.includes('Qwen3'))
           || models[0];
         if (qwen) modelSelect.value = qwen.id;
+      } else if (provider === 'nvidia') {
+        const nvDefault =
+          models.find(m => m.id === 'meta/llama-3.3-70b-instruct') ||
+          models.find(m => m.id === 'nvidia/llama-3.3-nemotron-super-49b-v1') ||
+          models.find(m => m.id === 'meta/llama-3.1-70b-instruct') ||
+          models.find(m => m.id === 'mistralai/mixtral-8x22b-instruct-v0.1') ||
+          models[0];
+        if (nvDefault) modelSelect.value = nvDefault.id;
       } else {
         const recommended = models.find(m => m.id.includes('gpt-4o-mini'));
         if (recommended) modelSelect.value = recommended.id;
@@ -10280,6 +10531,10 @@ async function callModel(messages) {
     return await callDeepSeek(model, key, messages);
   }
 
+  if (provider === 'nvidia') {
+    return await callNvidia(model, key, messages, getActiveToolDefs(), 0.2);
+  }
+
   let endpoint = '';
   if (provider === 'openai') {
     endpoint = 'https://api.openai.com/v1/chat/completions';
@@ -10455,6 +10710,14 @@ async function callGemini(model, key, messages) {
   }
   return result;
 }
+/* ========= NVIDIA NIM (build.nvidia.com) helpers ========= */
+
+/** Получить базовый URL NVIDIA NIM API (без хвостовых слешей). */
+function getNvidiaBase() {
+  const raw = (document.getElementById('nvidiaBase')?.value || '').trim() || 'https://integrate.api.nvidia.com/v1';
+  return raw.replace(/\/+$/, '');
+}
+
 /* ========= Qwen AI Kit — полная интеграция API ========= */
 
 /** Получить базовый URL Qwen API */
@@ -10954,6 +11217,147 @@ async function callDeepSeek(model, key, messages) {
     msg.reasoning = msg.reasoning_content;
   }
 
+  return msg;
+}
+
+/* ========= NVIDIA NIM API (build.nvidia.com) =========
+ * OpenAI-совместимый эндпоинт /v1/chat/completions с поддержкой:
+ *   • tool calling (большинство Llama-3.1+/Nemotron/Mixtral/QwQ моделей)
+ *   • reasoning_content (DeepSeek-R1, Nemotron-Reasoning, QwQ, gpt-oss)
+ *   • streaming SSE
+ *   • vision (Phi-3.5-Vision, Llama-3.2-Vision и т.д.)
+ *
+ * Передавайте tools=[] (или null) чтобы отключить tool-calling, например для
+ * моделей, которые ломаются на tool_choice=auto.
+ */
+async function callNvidia(model, key, messages, tools, temperature, signalOverride) {
+  const base = getNvidiaBase();
+  const showThinking = localStorage.getItem('agent_nvidia_show_thinking') !== 'false';
+  const useStream    = localStorage.getItem('agent_nvidia_stream') === 'true';
+  const useTools     = Array.isArray(tools) && tools.length > 0;
+
+  // Reasoning-семейство: dedup tool_calls в истории + temperature по умолчанию мягче
+  const isReasoner = /(?:^|\/)(deepseek-r1|qwq|gpt-oss)|nemotron-(super|ultra|nano).*reason|nemotron-3|reasoning/i.test(model);
+
+  const body = {
+    model,
+    messages,
+    temperature: typeof temperature === 'number' ? temperature : (isReasoner ? 0.6 : 0.2),
+    stream: !!useStream,
+    ...(useTools ? { tools, tool_choice: 'auto' } : {}),
+  };
+
+  const endpoint = base + '/chat/completions';
+  console.log('[NVIDIA] →', model, endpoint,
+    '| reasoning:', isReasoner,
+    '| tools:', useTools ? tools.length : 0,
+    '| stream:', !!useStream);
+
+  const signal = signalOverride || (currentAbortController && currentAbortController.signal);
+
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + key,
+        'Accept': useStream ? 'text/event-stream' : 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (netErr) {
+    if (netErr.name === 'AbortError') throw netErr;
+    if (netErr.name === 'TypeError' || (netErr.message || '').includes('fetch')) {
+      throw new Error(
+        `NVIDIA NIM недоступен по адресу ${base}. ` +
+        `Проверьте Base URL и сетевое соединение.`
+      );
+    }
+    throw netErr;
+  }
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => res.statusText);
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`NVIDIA HTTP ${res.status}: невалидный nvapi-ключ. Получите ключ на build.nvidia.com → Get API Key.`);
+    }
+    if (res.status === 404) {
+      throw new Error(`NVIDIA HTTP 404: модель «${model}» не найдена. Откройте каталог build.nvidia.com и выберите доступную модель.`);
+    }
+    if (res.status === 429) {
+      throw new Error(`NVIDIA HTTP 429: достигнут лимит запросов. Подождите немного или подключите платный тариф.`);
+    }
+    throw new Error('NVIDIA HTTP ' + res.status + ': ' + t);
+  }
+
+  // Не-streaming ветка (по умолчанию): читаем JSON и возвращаем message.
+  if (!useStream) {
+    const data = await safeResponseJSON(res, 'NVIDIA');
+    if (data.usage) tokenTracker.update(data.usage);
+    const msg = data.choices?.[0]?.message;
+    if (!msg) throw new Error('NVIDIA: пустой ответ от модели');
+    if (msg.reasoning_content && showThinking) {
+      msg.reasoning = msg.reasoning_content;
+    }
+    return msg;
+  }
+
+  // Streaming SSE: собираем content / reasoning_content / tool_calls.
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('NVIDIA: streaming недоступен (нет ReadableStream)');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let role = 'assistant';
+  let content = '';
+  let reasoning = '';
+  const toolCallsAcc = new Map(); // index → { id, type, function: { name, arguments } }
+  let lastUsage = null;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || '';
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line || !line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (payload === '[DONE]') continue;
+      let evt;
+      try { evt = JSON.parse(payload); } catch { continue; }
+      if (evt.usage) lastUsage = evt.usage;
+      const delta = evt.choices?.[0]?.delta;
+      if (!delta) continue;
+      if (delta.role) role = delta.role;
+      if (typeof delta.content === 'string') content += delta.content;
+      if (typeof delta.reasoning_content === 'string') reasoning += delta.reasoning_content;
+      if (Array.isArray(delta.tool_calls)) {
+        for (const tc of delta.tool_calls) {
+          const idx = tc.index ?? toolCallsAcc.size;
+          const cur = toolCallsAcc.get(idx) || { id: '', type: 'function', function: { name: '', arguments: '' } };
+          if (tc.id) cur.id = tc.id;
+          if (tc.type) cur.type = tc.type;
+          if (tc.function) {
+            if (tc.function.name) cur.function.name += tc.function.name;
+            if (tc.function.arguments) cur.function.arguments += tc.function.arguments;
+          }
+          toolCallsAcc.set(idx, cur);
+        }
+      }
+    }
+  }
+
+  if (lastUsage) tokenTracker.update(lastUsage);
+  const msg = { role, content };
+  if (reasoning && showThinking) msg.reasoning = reasoning;
+  if (toolCallsAcc.size > 0) {
+    msg.tool_calls = [...toolCallsAcc.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([, v]) => v);
+  }
   return msg;
 }
 
@@ -12064,7 +12468,16 @@ async function callSubAgentModel(messages, subTools) {
     };
     return await callGeminiWithTools(model, key, messages, geminiSubTools);
   }
-  
+
+  // ⭐ NVIDIA NIM sub-agent
+  if (provider === 'nvidia') {
+    const subController = new AbortController();
+    if (currentAbortController) {
+      currentAbortController.signal.addEventListener('abort', () => subController.abort());
+    }
+    return await callNvidia(model, key, messages, subTools, 0.15, subController.signal);
+  }
+
   // ⭐ Qwen AI Kit sub-agent
   if (provider === 'qwen') {
     const base = getQwenBase();
