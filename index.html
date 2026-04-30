@@ -8566,14 +8566,14 @@ const toolDefs = [
   {
     type: 'function',
     function: {
-      name: 'finish_task',
-      description: 'Signal that the entire task is complete and you have nothing more to do. Call this LAST, after all work is finished and (if a plan exists) every plan step is marked done via update_plan. The "summary" you provide here becomes your final reply to the user — write it as if speaking directly to them. The agent loop ENDS only when you call finish_task; otherwise the system will keep prompting you to continue. Do NOT call finish_task while you still have pending steps or unresolved errors.',
+      name: 'end_task',
+      description: 'Signal that the entire task is complete and you have nothing more to do. Call this LAST, after all work is finished and (if a plan exists) every plan step is marked done via update_plan. The agent loop ENDS only when you call end_task; otherwise the system will keep prompting you to continue. Three valid usage patterns: (1) Write your final reply as plain text AND call end_task in the same turn — your text becomes the final user-facing message. (2) Call end_task alone with NO text content — the system uses your most recent text reply (the one the system nudged you about) as the final message. (3) Pass an explicit "end_message" argument — that text becomes the final message. Do NOT call end_task while you still have pending steps or unresolved errors.',
       parameters: {
         type: 'object',
         properties: {
-          summary: { type: 'string', description: 'Final user-facing message: what you accomplished, key results, files changed, etc. Plain text or markdown. This is shown to the user as your closing message.' }
+          end_message: { type: 'string', description: 'Optional. Explicit final user-facing message. Usually you do NOT need to set this — just write your reply as the assistant text content of this turn (or in your previous turn if you already did) and the system will use it. Only set end_message if you want to override the visible text with a different closing line.' }
         },
-        required: ['summary']
+        required: []
       }
     }
   }
@@ -11731,7 +11731,11 @@ Delegation (optional):
 - delegate_task(task, context?, step_title) — send a micro-task to an isolated sub-agent. The sub-agent has file tools but zero memory of this conversation. Describe everything it needs. Useful for parallelizing work or isolating complex subtasks.
 
 Completion:
-- finish_task(summary) — REQUIRED to end your turn. The agent loop runs continuously until you explicitly call this tool. A plain text reply WITHOUT a tool call does NOT finish the task — the system will nudge you to either keep working or call finish_task. The "summary" becomes your final user-facing reply. Call finish_task only when ALL work is genuinely done (and, if a plan exists, every step is marked done via update_plan first). Even for trivial requests like greetings, end with finish_task("Hello! ...").
+- end_task() — REQUIRED to end your turn. The agent loop runs continuously until you explicitly call this tool. A plain text reply WITHOUT a tool call does NOT finish the task — the system will nudge you to either keep working or call end_task. Three valid completion patterns:
+    (a) Write your final reply as text AND call end_task in the same turn → your text becomes the user-facing closing message.
+    (b) After a text-only reply got nudged: on the next turn, call end_task ALONE (no text, no end_message) → your previous text is used as the closing message.
+    (c) Override: call end_task(end_message="...") → that string becomes the closing message regardless of your text content.
+  Call end_task only when ALL work is genuinely done (and, if a plan exists, every step is marked done via update_plan first). Even for trivial requests like greetings, write the greeting as text and call end_task in the same turn.
 
 TIPS:
 - Read before edit. Use read_file(path, start_line, end_line) to load ONLY the relevant section — saves context and is faster.
@@ -11826,7 +11830,7 @@ RULES:
 - After edit_lines/insert_content, line numbers shift — re-read before next edit.
 - If changing >50% of a file, rewrite it entirely with write_file.
 - Focus on QUALITY: clean code, proper naming, correct logic.
-- To FINISH, call finish_task(summary) with a BRIEF report (2-5 sentences): what you did, which files changed, any decisions you made. The agent loop ends only when finish_task is called — a plain text reply alone does NOT finish your turn.`;
+- To FINISH, call end_task with a BRIEF report (2-5 sentences) describing what you did, which files changed, and any decisions. You can either: (a) write the report as your assistant text and call end_task() in the same turn, OR (b) pass the report as end_task(end_message="..."). The agent loop ends only when end_task is called — a plain text reply alone does NOT finish your turn.`;
 
 // Tools available to sub-agents (no delegate_task, no update_plan)
 function getSubAgentToolDefs() {
@@ -11897,8 +11901,8 @@ async function runSubAgent(task, context = '', stepTitle = 'Sub-task', uiElement
     updateUI(subLog, 'работает...', 'working');
 
     // ─── Unified non-stop sub-agent loop ────────────────────────────────────
-    // Exits ONLY on: explicit finish_task call, MAX_SUB_STEPS, or 2 consecutive
-    // empty replies (no tool_calls + no finish_task).
+    // Exits ONLY on: explicit end_task call, MAX_SUB_STEPS, or 2 consecutive
+    // empty replies (no tool_calls + no end_task).
     const MAX_SUB_NO_TOOL = 2;
     let subConsecutiveNoTool = 0;
     let subFinishSummary = null;
@@ -11916,7 +11920,7 @@ async function runSubAgent(task, context = '', stepTitle = 'Sub-task', uiElement
         updateUI(subLog, `шаг ${step + 1}...`, 'working');
         subMessages.push({
           role: 'user',
-          content: `[Системное сообщение] При обращении к модели произошла ошибка: ${e.message}. Не повторяй уже сделанное. Когда задача выполнена — вызови finish_task(summary).`
+          content: `[Системное сообщение] При обращении к модели произошла ошибка: ${e.message}. Не повторяй уже сделанное. Когда задача выполнена — вызови end_task.`
         });
         step++;
         continue;
@@ -11925,7 +11929,7 @@ async function runSubAgent(task, context = '', stepTitle = 'Sub-task', uiElement
       if (msg && msg.tool_calls && msg.tool_calls.length) {
         subConsecutiveNoTool = 0;
 
-        // Render labels + detect forbidden / finish_task
+        // Render labels + detect forbidden / end_task
         for (const call of msg.tool_calls) {
           const name = call.function.name;
           const args = safeParseToolArgs(call.function.arguments);
@@ -11952,9 +11956,12 @@ async function runSubAgent(task, context = '', stepTitle = 'Sub-task', uiElement
             subMessages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ error: 'This tool is not available to sub-agents.' }) });
             continue;
           }
-          if (name === 'finish_task') {
+          if (name === 'end_task') {
             const a = safeParseToolArgs(call.function.arguments);
-            subFinishSummary = (a && typeof a.summary === 'string') ? a.summary : '';
+            const explicit = (a && typeof a.end_message === 'string') ? a.end_message.trim() : '';
+            const turnText = (msg.content || '').trim();
+            // Priority: explicit end_message → text in this turn → previous text-only reply → '' (fallback later)
+            subFinishSummary = explicit || turnText || lastAssistantText || '';
             subMessages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ ok: true }) });
             continue;
           }
@@ -11988,20 +11995,20 @@ async function runSubAgent(task, context = '', stepTitle = 'Sub-task', uiElement
         subMessages.push({ role: 'assistant', content: lastAssistantText });
       }
       if (subConsecutiveNoTool >= MAX_SUB_NO_TOOL) {
-        subLog.push({ icon: 'alert-circle', text: 'Не вызвал finish_task — завершаю принудительно' });
+        subLog.push({ icon: 'alert-circle', text: 'Не вызвал end_task — завершаю принудительно' });
         break;
       }
       subMessages.push({
         role: 'user',
-        content: `[Системное напоминание] Ты ответил текстом, но не вызвал ни одного инструмента и не вызвал finish_task. Текстовый ответ не завершает работу. Если задача выполнена — вызови finish_task(summary). Если нет — продолжай работать инструментами.`
+        content: `[Системное напоминание] Ты ответил текстом, но не вызвал ни одного инструмента и не вызвал end_task. Текстовый ответ сам по себе не завершает работу. Если задача выполнена — вызови end_task() БЕЗ аргументов в следующем turn'е, и твой только что написанный текст автоматически станет финальным отчётом. Если ещё есть что доделать — продолжай работать инструментами, не повторяй уже сделанное.`
       });
       updateUI(subLog, `шаг ${step + 1}...`, 'working');
       step++;
     }
 
-    // Final report: prefer finish_task summary, fallback to last text
+    // Final report: prefer end_task message, fallback to last text
     const report = subFinishSummary !== null
-      ? (subFinishSummary.trim() || lastAssistantText || 'Готово')
+      ? ((subFinishSummary && subFinishSummary.trim()) || lastAssistantText || 'Готово')
       : (lastAssistantText || '(Суб-агент не предоставил отчёт)');
     subLog.push({ icon: 'check-circle', text: 'Завершено' });
     updateUI(subLog, '✓ готово', 'done');
@@ -12488,7 +12495,7 @@ function humanizeToolCall(name, args) {
   if (name === 'use_skill') {
     return ic('layers') + 'Скил: ' + (args.skill_name || '');
   }
-  if (name === 'finish_task') {
+  if (name === 'end_task') {
     return ic('check-circle') + 'Завершение задачи';
   }
   return ic('zap') + name;
@@ -12643,9 +12650,9 @@ async function runAgent(userText) {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Единый non-stop agent-loop. Цикл выходит ТОЛЬКО по:
-  //  1) явному вызову finish_task,
+  //  1) явному вызову end_task,
   //  2) лимиту шагов (MAX_STEPS),
-  //  3) лимиту подряд идущих "пустых" ответов (no tool_calls + no finish_task),
+  //  3) лимиту подряд идущих "пустых" ответов (no tool_calls + no end_task),
   //  4) лимиту подряд идущих ошибок callModel,
   //  5) AbortError (пользователь нажал стоп).
   // Ошибки callModel и пустые ответы НЕ останавливают работу — модели пушится
@@ -12662,6 +12669,7 @@ async function runAgent(userText) {
   let consecutiveNoTool = 0;
   let consecutiveErrors = 0;
   let finishSummary = null;
+  let finishAlreadyShown = false; // true когда финальный текст пришёл из истории и уже отрендерен как bubble
   try {
     while (step < MAX_STEPS && finishSummary === null) {
       // Inter-step delay
@@ -12697,7 +12705,7 @@ async function runAgent(userText) {
         console.error('[AGENT] callModel error:', e);
         // Пользователю — только компактный значок. Полный текст ошибки
         // уходит в историю как system-message: LLM видит детали и сама решает,
-        // как поступить (повторить, поменять стратегию, вызвать finish_task).
+        // как поступить (повторить, поменять стратегию, вызвать end_task).
         addErrorAction();
         if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
           setStatus('Ошибка', 'error');
@@ -12705,7 +12713,7 @@ async function runAgent(userText) {
         }
         chat.messages.push({
           role: 'user',
-          content: `[Системное сообщение] При обращении к модели произошла ошибка: ${errMsg}. Не повторяй уже сделанное. Если задача ещё не завершена — продолжай работать инструментами; когда всё готово — вызови finish_task(summary).`
+          content: `[Системное сообщение] При обращении к модели произошла ошибка: ${errMsg}. Не повторяй уже сделанное. Если задача ещё не завершена — продолжай работать инструментами; когда всё готово — вызови end_task.`
         });
         step++;
         continue;
@@ -12715,16 +12723,18 @@ async function runAgent(userText) {
         addMsg('assistant', msg.reasoning, true);
       }
 
-      // ── Branch 1: model returned tool_calls (possibly including finish_task) ──
+      // ── Branch 1: model returned tool_calls (possibly including end_task) ──
       if (msg && msg.tool_calls && msg.tool_calls.length) {
         consecutiveNoTool = 0;
-        const finishCall = msg.tool_calls.find(c => c.function.name === 'finish_task');
+        const finishCall = msg.tool_calls.find(c => c.function.name === 'end_task');
+        const turnText = (msg.content && String(msg.content).trim()) ? String(msg.content) : '';
 
-        // Render tool action labels
+        // Render tool action labels (для end_task label не нужен — финальный bubble отрендерим ниже)
         setStatus(`Выполнение (шаг ${step + 1})...`, 'working');
         for (let _ci = 0; _ci < msg.tool_calls.length; _ci++) {
           const call = msg.tool_calls[_ci];
           const name = call.function.name;
+          if (name === 'end_task') continue;
           const args = safeParseToolArgs(call.function.arguments);
           const humanText = name === 'delegate_task'
             ? `🤖 Делегирование: ${args.step_title || 'подзадача'}`
@@ -12732,24 +12742,58 @@ async function runAgent(userText) {
           addToolAction(humanText, _ci === 0 ? (msg.content || null) : null);
         }
 
-        // Push assistant turn (with tool_calls) into history
+        // Push assistant turn (with tool_calls) into history.
+        // Если в этом turn'е есть end_task И есть text content — НЕ кладём content в этот же
+        // turn, потому что финальный текст уйдёт в историю отдельным assistant-сообщением
+        // через addMsg ниже. Это важно: иначе один и тот же текст окажется в истории дважды
+        // (в assistant-with-tool_calls и в assistant-final), что путает контекст модели на
+        // следующем пользовательском сообщении и создаёт эффект «новой ветки».
+        const assistantContent = finishCall ? null : (msg.content || null);
         chat.messages.push({
           role: msg.role,
-          content: msg.content || null,
+          content: assistantContent,
           tool_calls: msg.tool_calls,
           _geminiParts: msg._geminiParts
         });
 
-        // Execute every tool. finish_task is handled inline (no toolImpl).
+        // Execute every tool. end_task is handled inline (no toolImpl).
         for (const call of msg.tool_calls) {
           const callName = call.function.name;
-          if (callName === 'finish_task') {
+          if (callName === 'end_task') {
             const a = safeParseToolArgs(call.function.arguments);
-            finishSummary = (a && typeof a.summary === 'string') ? a.summary : '';
+            const explicit = (a && typeof a.end_message === 'string') ? a.end_message.trim() : '';
+            // Приоритет финального текста для пользователя:
+            //   1) explicit end_message arg (override)
+            //   2) text написанный моделью В ЭТОМ turn'е (паттерн: text + end_task в одном turn)
+            //   3) последний text-only assistant ответ ранее в этом run'е
+            //      (паттерн: модель написала текст, получила nudge, в следующем turn'е
+            //       вызвала end_task() без аргументов — финалом становится тот предыдущий текст)
+            //   4) пусто → ниже отрендерим как «Готово»
+            let finalText = '';
+            if (explicit) {
+              finalText = explicit;
+              finishAlreadyShown = false;
+            } else if (turnText) {
+              finalText = turnText;
+              finishAlreadyShown = false;
+            } else {
+              for (let i = chat.messages.length - 1; i >= 0; i--) {
+                const m = chat.messages[i];
+                if (m.role === 'assistant' && !m.tool_calls && typeof m.content === 'string' && m.content.trim()) {
+                  finalText = m.content;
+                  // Этот текст уже был отрендерен как bubble в Branch 2 ранее
+                  // (model wrote text → nudge → теперь end_task без аргументов).
+                  // Не дублируем bubble в финале, чтобы не было двух одинаковых сообщений.
+                  finishAlreadyShown = true;
+                  break;
+                }
+              }
+            }
+            finishSummary = finalText;
             chat.messages.push({
               role: 'tool',
               tool_call_id: call.id,
-              name: 'finish_task',
+              name: 'end_task',
               content: JSON.stringify({ ok: true })
             });
             continue;
@@ -12798,7 +12842,7 @@ async function runAgent(userText) {
       }
 
       if (consecutiveNoTool >= MAX_CONSECUTIVE_NO_TOOL) {
-        addMsg('system', `⚠️ Модель ${MAX_CONSECUTIVE_NO_TOOL} раза подряд не вызвала ни одного инструмента и не вызвала finish_task. Останавливаю автопродолжение — напишите «продолжи» или уточните задачу.`);
+        addMsg('system', `⚠️ Модель ${MAX_CONSECUTIVE_NO_TOOL} раза подряд не вызвала ни одного инструмента и не вызвала end_task. Останавливаю автопродолжение — напишите «продолжи» или уточните задачу.`);
         break;
       }
 
@@ -12807,9 +12851,9 @@ async function runAgent(userText) {
       let nudgeText;
       if (currentPlan.length > 0 && !planProgress.complete) {
         const remaining = currentPlan.filter(s => !s.done).map(s => '"' + s.title + '"').join(', ');
-        nudgeText = `[Системное напоминание] Ты ответил текстом, но не вызвал ни одного инструмента — работа НЕ завершена. План ещё не выполнен (${planProgress.done}/${planProgress.total}). Остаются шаги: ${remaining}. Не повторяй уже сделанное — продолжай ровно с того места, где остановился: вызывай инструменты и помечай шаги через update_plan. Когда задача действительно завершена — вызови finish_task(summary). Текстовый ответ без tool_call работу НЕ завершает.`;
+        nudgeText = `[Системное напоминание] Ты ответил текстом, но не вызвал ни одного инструмента — работа НЕ завершена. План ещё не выполнен (${planProgress.done}/${planProgress.total}). Остаются шаги: ${remaining}. Не повторяй уже сделанное — продолжай ровно с того места, где остановился: вызывай инструменты и помечай шаги через update_plan. Когда задача действительно завершена — вызови end_task. Текстовый ответ без tool_call работу НЕ завершает.`;
       } else {
-        nudgeText = `[Системное напоминание] Ты ответил текстом, но не вызвал ни одного инструмента — работа НЕ завершена. Если задача действительно выполнена — вызови finish_task(summary), и твой текст станет финальным ответом пользователю. Если ещё нет — продолжай работать инструментами, не повторяй уже сделанное.`;
+        nudgeText = `[Системное напоминание] Ты ответил текстом, но не вызвал ни одного инструмента — сам по себе текст работу НЕ завершает. Если задача действительно выполнена — вызови end_task() БЕЗ аргументов в следующем turn'е, и твой только что написанный текст автоматически станет финальным ответом пользователю (дублировать его в end_message не нужно). Если ещё нет — продолжай работать инструментами, не повторяй уже сделанное.`;
       }
       chat.messages.push({ role: 'user', content: nudgeText });
       setStatus('⚠️ Нет вызова инструмента — напоминаем модели...', 'working');
@@ -12818,10 +12862,19 @@ async function runAgent(userText) {
 
     // ─── Loop finished. Finalize. ────────────────────────────────────────────
     if (finishSummary !== null) {
-      const out = finishSummary && finishSummary.trim()
-        ? finishSummary
-        : 'Готово';
-      await addMsg('assistant', out);
+      // Если финальный текст пришёл из истории (finishAlreadyShown=true), он уже
+      // отрендерен пользователю как assistant-bubble в Branch 2 ранее — не дублируем.
+      // Но в API-историю всё равно нужно добавить чистый финальный assistant-turn,
+      // чтобы на следующем сообщении пользователя модель видела однозначное закрытие.
+      if (finishAlreadyShown) {
+        // Текст уже в chat.messages как обычный assistant-turn (его и нашли поиском).
+        // Дополнительно ничего не пушим и не рендерим.
+      } else {
+        const out = finishSummary && finishSummary.trim()
+          ? finishSummary
+          : 'Готово';
+        await addMsg('assistant', out);
+      }
     } else if (step >= MAX_STEPS) {
       addMsg('system', `⚠️ Достигнут лимит шагов (${MAX_STEPS}). Напишите «продолжи» для продолжения работы.`);
     }
