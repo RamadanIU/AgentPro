@@ -80,6 +80,26 @@ anti-bot/Cloudflare/CAPTCHA, stealth/proxy/private-mode сценариев, Real
 сессий, сетевой диагностики, cookies/dialogs/HAR и точного извлечения
 rendered-контента.
 
+В репозиторий также включён полный каталог BrowserAct skills:
+
+* `tools/browseract-skills/browser-act/` — core BrowserAct CLI skill,
+  references, policies, proxy/security notes.
+* `tools/browseract-skills/solutions/` — 31 готовый solution/API skill
+  (Amazon/ecommerce, lead generation, Google Maps, web search/research,
+  Reddit/WeChat/Zhihu, YouTube).
+* `tools/browseract-skills/catalog.json` — машинно-читаемый список всех skills,
+  путей, категорий и требования `BROWSERACT_API_KEY`.
+
+Авторизация:
+
+* Core Real Chrome/local navigation (`browser real open`, `state`, `click`,
+  `get markdown`, etc.) может работать без `BROWSERACT_API_KEY`.
+* Stealth browser management, CAPTCHA/cloud-функции и все solution/API skills
+  требуют BrowserAct авторизацию.
+* Получить ключ: <https://www.browseract.com/reception/integrations>.
+  Затем можно выполнить `browser-act auth set <API_KEY>` или передать
+  `BROWSERACT_API_KEY` окружением для scripts из `tools/browseract-skills/solutions/`.
+
 Базовый цикл BrowserAct внутри чата:
 
 ```text

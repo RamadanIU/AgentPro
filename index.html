@@ -16818,6 +16818,12 @@ const SkillsEngine = (() => {
 
 Use BrowserAct when the user says BrowserAct/browser-act, or when the task needs browser automation with stealth, CAPTCHA solving, proxy/private mode, Real Chrome sessions, rendered extraction, network/HAR inspection, cookies, dialogs, or reliable scraping.
 
+Bundled references:
+- Core skill: tools/browseract-skills/browser-act/SKILL.md
+- Commands/policies/proxy/security: tools/browseract-skills/browser-act/references/
+- Full solution catalog: tools/browseract-skills/catalog.json
+- Solution skills/scripts: tools/browseract-skills/solutions/
+
 Install/runtime: \`browser-act\` is provided by \`browser-act-cli\` and installed by Agent Pro start.sh via \`uv tool install browser-act-cli --python 3.12\`.
 
 Core loop:
@@ -16835,7 +16841,20 @@ Policies:
 - If credentials, MFA, payment confirmation, or visual page review are needed and not already provided, call browser_act(command: "human-assist-url --objective \\"Please complete/review ...\\"") and wait for the user before continuing.
 - If solve-captcha fails, request human assist.
 - Do not delete BrowserAct browsers, clear profiles, or clear cookies unless the user explicitly asked.
-- Prefer separate sessions for parallel work: browser_act(command: "...", session: "task-name").`
+- Prefer separate sessions for parallel work: browser_act(command: "...", session: "task-name").
+
+Auth:
+- Core Real Chrome/local navigation can run without \`BROWSERACT_API_KEY\`.
+- BrowserAct cloud operations and all solution/API skills require BrowserAct authorization.
+- Before using any skill in tools/browseract-skills/solutions/, check for \`BROWSERACT_API_KEY\` or \`browser-act auth poll\`.
+- If missing, ask the user for BrowserAct API key or guide them to https://www.browseract.com/reception/integrations, then run \`browser-act auth set <API_KEY>\` or export \`BROWSERACT_API_KEY\` for the script.
+
+Available solution/API skill groups:
+- ecommerce: Amazon ASIN lookup, best-sellers, buy-box, competitor/listing/product/search/reviews analysis.
+- lead-generation: business contacts/social links, GitHub contributors, Google Maps search/reviews/business data, industry contacts, social profile finder.
+- search-research: Google Images, Google News, web search scraper, web research assistant.
+- social-listening: Reddit competitor analysis, WeChat article search, Zhihu search.
+- video-platforms: YouTube search/channel/video/comments/influencer/transcript/analysis skills.`
     }];
     let changed = false;
     for (const builtin of builtins) {
