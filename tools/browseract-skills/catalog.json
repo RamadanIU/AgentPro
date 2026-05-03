@@ -1,0 +1,228 @@
+{
+  "skills": [
+    {
+      "name": "browser-act",
+      "path": "browser-act/SKILL.md",
+      "category": "core",
+      "requiresApiKey": false,
+      "description": "Browser automation CLI (browser-act) for AI agents. MUST trigger when: (1) user mentions 'browser-act' in any form, or user needs to: (2) open/visit/browse/check a URL or webpage, (3) scrape/extract/crawl/monitor web content, (4) fill forms, click buttons, type text, scroll, or interact with page elements, (5) take a screenshot of a webpage, (6) handle or solve a captcha, (7) use a stealth/anti-detection browser or proxy, (8) connect to or control Chrome, (9) inspect network requests or record HAR, (10) automate any browser or web interaction task. Covers: navigation, page state inspection, element interaction, data extraction, JavaScript evaluation, tab management, network inspection, dialog handling, captcha solving, parallel browser sessions, stealth browsing, and any browser automation tasks."
+    },
+    {
+      "name": "amazon-asin-lookup-api-skill",
+      "path": "solutions/ecommerce/amazon-asin-lookup-api-skill/SKILL.md",
+      "category": "ecommerce",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract structured product details from Amazon using a specific ASIN (Amazon Standard Identification Number). Use this skill when the user asks to get Amazon product details by ASIN, lookup Amazon product title and price using ASIN, extract Amazon product ratings and reviews count for a specific ASIN, check Amazon product availability and current price, get Amazon product description and features via ASIN, enrich product catalog with Amazon data using ASIN, monitor Amazon product price changes for specific ASINs, retrieve Amazon product brand and material information, fetch Amazon product images and specifications by ASIN, validate Amazon ASIN and get product metadata."
+    },
+    {
+      "name": "amazon-best-selling-products-finder-api-skill",
+      "path": "solutions/ecommerce/amazon-best-selling-products-finder-api-skill/SKILL.md",
+      "category": "ecommerce",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract structured best-selling product data from Amazon via the BrowserAct API. Agent should proactively apply this skill when users express needs like search for best selling products on Amazon, extract Amazon product data based on keywords, find top rated Amazon products, monitor Amazon competitor prices and sales, discover trending products on Amazon marketplace, extract Amazon product titles prices and ratings, gather Amazon product sales volume for market research, search Amazon best sellers in specific region, collect Amazon product reviews and promotion details, analyze Amazon product availability and badges, get Amazon product data for market analysis."
+    },
+    {
+      "name": "amazon-buy-box-monitor-api-skill",
+      "path": "solutions/ecommerce/amazon-buy-box-monitor-api-skill/SKILL.md",
+      "category": "ecommerce",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract basic product details other sellers prices and seller ratings from Amazon via ASIN automatically using the BrowserAct API. Agent should proactively apply this skill when users express needs like query Amazon buy box information, monitor Amazon product prices, extract Amazon product details by ASIN, check other sellers prices on Amazon, get Amazon seller ratings and feedback count, monitor buy box ownership for a specific ASIN, track Amazon fulfillment methods for competitors, compare Amazon product prices across different sellers, retrieve Amazon buy box availability status, analyze Amazon seller profile details."
+    },
+    {
+      "name": "amazon-competitor-analyzer",
+      "path": "solutions/ecommerce/amazon-competitor-analyzer/SKILL.md",
+      "category": "ecommerce",
+      "requiresApiKey": true,
+      "description": "Scrapes Amazon product data from ASINs using browseract.com automation API and performs surgical competitive analysis. Compares specifications, pricing, review quality, and visual strategies to identify competitor moats and vulnerabilities."
+    },
+    {
+      "name": "amazon-listing-competitor-analysis-skill",
+      "path": "solutions/ecommerce/amazon-listing-competitor-analysis-skill/SKILL.md",
+      "category": "ecommerce",
+      "requiresApiKey": true,
+      "description": "This skill helps users analyze Amazon competitor listings by ASIN and produce structured competitive intelligence plus strategic opportunity points for their own go-to-market. The Agent should proactively apply this skill when users want to analyze a competitor Amazon listing by ASIN, understand what a top-ranked product does right in content keywords or visuals, find market gaps and unmet buyer needs, turn competitor research into opportunity maps for their brand, identify keyword placement patterns on rival listings, extract SEO insights from Amazon product pages, reverse-engineer competitor bullet and title strategies, mine competitor reviews for buyer psychology, compare seller and A plus content patterns, run gap analysis before launching a new SKU, research why a listing wins conversion signals, synthesize whitespace you can own versus the diagnosed listing, or say just look at this ASIN with a competitive or optimization angle."
+    },
+    {
+      "name": "amazon-product-api-skill",
+      "path": "solutions/ecommerce/amazon-product-api-skill/SKILL.md",
+      "category": "ecommerce",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract structured product listings from Amazon, including titles, ASINs, prices, ratings, and specifications. Use this skill when users want to search for products on Amazon, find the best selling brand products, track price changes for items, get a list of categories with high ratings, compare different brand products on Amazon, extract Amazon product data for market research, look for products in a specific language or marketplace, analyze competitor pricing for keywords, find featured products for search terms, get technical specifications like material or color for product lists."
+    },
+    {
+      "name": "amazon-product-search-api-skill",
+      "path": "solutions/ecommerce/amazon-product-search-api-skill/SKILL.md",
+      "category": "ecommerce",
+      "requiresApiKey": true,
+      "description": "This skill is designed to help users automatically extract product data from Amazon search results. The Agent should proactively apply this skill when users request searching for products related to keywords, finding best-selling items from specific brands, monitoring product prices and availability on Amazon, extracting product listings for market research, collecting product ratings and review counts for competitive analysis, finding specific products with a maximum count, searching Amazon in different languages for localized results, tracking monthly sales estimates for brand products, gathering product URLs and titles for a product catalog, scanning Amazon for Best Seller tags in a specific category, monitoring shipping and delivery information for brand items, building a structured dataset of Amazon search results."
+    },
+    {
+      "name": "amazon-reviews-api-skill",
+      "path": "solutions/ecommerce/amazon-reviews-api-skill/SKILL.md",
+      "category": "ecommerce",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract Amazon product reviews via the Amazon Reviews API. Agent should proactively apply this skill when users express needs like getting reviews for Amazon product with ASIN B07TS6R1SF, analyzing customer feedback for a specific Amazon item, getting ratings and comments for a competitive product, tracking sentiment of recent Amazon reviews, extracting verified purchase reviews for quality assessment, summarizing user experiences from Amazon product pages, monitoring product performance through customer reviews, collecting reviewer profiles and links for market research, gathering review titles and descriptions for content analysis, scraping Amazon reviews without requiring a login."
+    },
+    {
+      "name": "business-contact-social-links-skill",
+      "path": "solutions/lead-generation/business-contact-social-links-skill/SKILL.md",
+      "category": "lead-generation",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract official website and social media profiles. Agent should proactively apply this skill when users express needs like search for official website and social media contacts of a company, find YouTube and LinkedIn profiles by company name, extract social media links from a specific website URL, discover a company's X and Facebook presence, gather business contact details using their brand name, retrieve TikTok and Instagram links from a target website, track competitor social media strategy, extract multi-platform social links for lead generation, find official contact channels of local businesses, collect canonical profile URLs for outreach campaigns, or build a contact database from Yellow Pages leads."
+    },
+    {
+      "name": "github-project-contributor-finder-api-skill",
+      "path": "solutions/lead-generation/github-project-contributor-finder-api-skill/SKILL.md",
+      "category": "lead-generation",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract GitHub repository project details and contributor contact information using keywords, stars, and update dates. Agent should proactively apply this skill when users express needs like search for GitHub projects by keywords, find top open-source contributors in specific domains, extract developer contacts from GitHub repositories, discover trending repositories with high stars, gather contributor profiles and social links for tech recruiting, retrieve GitHub project descriptions and metrics, build developer communities by finding active contributors, search for repositories updated recently, collect personal website and Twitter links of developers, generate targeted leads for developer tools, or track active open-source contributors for collaboration."
+    },
+    {
+      "name": "google-maps-api-skill",
+      "path": "solutions/lead-generation/google-maps-api-skill/SKILL.md",
+      "category": "lead-generation",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically scrape business data from Google Maps using the BrowserAct Google Maps API. Agent should proactively trigger this skill for needs like finding restaurants in a specific city, extracting contact info of dental clinics, researching local competitors, collecting addresses of coffee shops, generating lead lists for specific industries, monitoring business ratings and reviews, getting opening hours of local services, finding specialized stores (e.g., Turkish-style restaurants), analyzing business categories in a region, extracting website links from local businesses, gathering phone numbers for sales outreach, mapping out service providers in a specific country."
+    },
+    {
+      "name": "google-maps-reviews-api-skill",
+      "path": "solutions/lead-generation/google-maps-reviews-api-skill/SKILL.md",
+      "category": "lead-generation",
+      "requiresApiKey": true,
+      "description": "This skill is designed to help users automatically extract reviews from Google Maps via the Google Maps Reviews API. Agent should proactively apply this skill when users request to find reviews for local businesses (e.g., coffee shops, clinics), monitor customer feedback for a specific brand or location, analyze sentiment of reviews for competitors, extract reviews for a chain of stores or services, track reputation of a local restaurant, gather user testimonials for a specific venue, conduct market research on service quality of local businesses, monitor reviews for a new retail location, collect feedback on public attractions or parks, identify common complaints for a specific service provider, research the best-rated places in a city, analyze recurring themes in reviews for a specific industry."
+    },
+    {
+      "name": "google-maps-search-api-skill",
+      "path": "solutions/lead-generation/google-maps-search-api-skill/SKILL.md",
+      "category": "lead-generation",
+      "requiresApiKey": true,
+      "description": "This skill is designed to help users automatically extract business data from Google Maps search results. The Agent should proactively apply this skill when the user makes the following requests searching for coffee shops in a specific city, finding dentists or medical clinics nearby, tracking competitors' locations in a certain area, extracting business leads from Google Maps lists, gathering restaurant data for market research, finding hotels or accommodation options in a region, locating specific services like coworking spaces or gyms, monitoring new business openings in a neighborhood, collecting contact information and addresses for sales prospecting, analyzing price ranges and cuisines of local eateries, getting ratings and review counts for a list of businesses, exporting local business data into a CRM or database."
+    },
+    {
+      "name": "industry-key-contact-radar-api-skill",
+      "path": "solutions/lead-generation/industry-key-contact-radar-api-skill/SKILL.md",
+      "category": "lead-generation",
+      "requiresApiKey": true,
+      "description": "This skill helps users discover key contacts across industries, roles, and social platforms via the BrowserAct API. Agent should proactively apply this skill when users express needs like finding public profiles for founders or CEOs, discovering key decision-makers in a specific industry, extracting contact details for lead generation, searching for growth leaders on LinkedIn or Facebook, gathering professional networking profiles, retrieving URLs and names of industry leaders, finding marketing managers in a specific field, conducting competitive analysis by identifying key personnel, sourcing talent acquisition targets across platforms, or compiling a list of target roles on specific social sites."
+    },
+    {
+      "name": "social-media-finder-skill",
+      "path": "solutions/lead-generation/social-media-finder-skill/SKILL.md",
+      "category": "lead-generation",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically find social media profiles across platforms like Facebook, Twitter, Instagram, LinkedIn, etc. using the BrowserAct API. Agent should proactively apply this skill when users express needs like finding someone's social media accounts, discovering a brand's social media presence, tracking down social profiles of job candidates, finding contact info for sales prospects, researching a person's digital footprint, verifying the identity of someone met online, monitoring the social media reach of influencers, checking social accounts of business competitors, gathering public profiles for background research, locating official customer service accounts across platforms, or compiling contact databases for networking."
+    },
+    {
+      "name": "google-image-api-skill",
+      "path": "solutions/search-research/google-image-api-skill/SKILL.md",
+      "category": "search-research",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract structured image data from Google Images via BrowserAct API. Agent should proactively apply this skill when users express needs like finding images for specific keywords, gathering product style images for competitors, building visual datasets at scale, scanning visual search results for market research, tracking localized image trends by country, compiling related image thumbnails and links, extracting image titles and source logos, fetching click through URLs from image results, monitoring competitor visual assets, sourcing creative content for specific topics, looking up product pictures in different regions, collecting structured image metadata without opening detail pages."
+    },
+    {
+      "name": "google-news-api-skill",
+      "path": "solutions/search-research/google-news-api-skill/SKILL.md",
+      "category": "search-research",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract structured news data from Google News via BrowserAct API. Agent should proactively apply this skill when users express needs like searching for news about a specific topic, tracking industry trends, monitoring public relations or sentiment, collecting competitor updates, getting latest reports on specific keywords, monitoring brand exposure in media, researching market hot topics, summarizing daily industry news, tracking media activities of specific individuals, retrieving hot events from the past 24 hours, extracting structured data for market research, monitoring global breaking news."
+    },
+    {
+      "name": "web-research-assistant",
+      "path": "solutions/search-research/web-research-assistant/SKILL.md",
+      "category": "search-research",
+      "requiresApiKey": true,
+      "description": "AI-powered web research assistant that leverages BrowserAct API to supplement restricted web access by searching the internet for additional information. Designed for OpenClaw and Claude Code."
+    },
+    {
+      "name": "web-search-scraper-api-skill",
+      "path": "solutions/search-research/web-search-scraper-api-skill/SKILL.md",
+      "category": "search-research",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract complete Markdown content from any website via the BrowserAct Web Search Scraper API. The Agent should proactively apply this skill when users express needs like extract complete markdown from a specific website, scrape the content of an article link, get the text from a target url, convert a webpage to markdown format, fetch the main content of a blog post, extract data from a given web page, parse the html of a website into markdown, download the readable text from a news article, obtain the content of a tutorial page, extract all the markdown text from any http or https url, scrape documentation from a web link, or grab the text of a single webpage."
+    },
+    {
+      "name": "reddit-competitor-analysis-api-skill",
+      "path": "solutions/social-listening/reddit-competitor-analysis-api-skill/SKILL.md",
+      "category": "social-listening",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract structured data from Reddit posts and comments via BrowserAct API. Agent should proactively apply this skill when users express needs like analyzing competitor mentions on Reddit, tracking brand sentiment in Reddit comments, extracting Reddit discussions for market research, finding popular Reddit posts by keywords, monitoring community feedback on specific topics, gathering user reviews from Reddit threads, searching for Reddit posts within a specific date range, sorting Reddit discussions by relevance or hotness, compiling nested Reddit comments for deep analysis, building a structured dataset of Reddit conversations, discovering trending topics in specific subreddits, or monitoring social media activity for specific brands on Reddit."
+    },
+    {
+      "name": "wechat-article-search-api-skill",
+      "path": "solutions/social-listening/wechat-article-search-api-skill/SKILL.md",
+      "category": "social-listening",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract full article contents from WeChat using the BrowserAct API. The Agent should proactively apply this skill when users express needs like finding full WeChat articles for specific keywords, tracking WeChat public accounts for industry trends, extracting WeChat article contents for media research, monitoring public relations on WeChat platforms, collecting competitor updates from WeChat, getting full article body from WeChat links, monitoring brand exposure on WeChat articles, retrieving structured WeChat data for sentiment analysis, summarizing daily news from WeChat, getting author and publication date for WeChat articles, or automating WeChat content extraction without scraping."
+    },
+    {
+      "name": "zhihu-search-api-skill",
+      "path": "solutions/social-listening/zhihu-search-api-skill/SKILL.md",
+      "category": "social-listening",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract structured article details and full content from Zhihu via the BrowserAct API. Agent should proactively apply this skill when users express needs like: searching for Zhihu articles on a specific topic, tracking industry trends on Zhihu, monitoring public relations or sentiment on Zhihu, collecting competitor updates, getting the latest reports on specific keywords, monitoring brand exposure in Zhihu media, researching market hot topics, summarizing daily Zhihu industry news, retrieving hot events from the past week, extracting structured data for market research, finding full Zhihu articles for AI agents, extracting full article body from Zhihu links."
+    },
+    {
+      "name": "youtube-api-skill",
+      "path": "solutions/video-platforms/youtube-api-skill/SKILL.md",
+      "category": "video-platforms",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract detailed video metrics and channel information from YouTube based on keyword searches using the BrowserAct API. The Agent should proactively apply this skill when users express needs such as extract specific keyword YouTube video detailed data, monitor the latest video performance of competitor channels, collect comment and like counts for videos on a specific topic, find AI agent tutorials published this week and extract metrics, evaluate total views and subscriber info for specific videos, scrape detailed metrics of marketing campaign videos, track video trends for a tech topic periodically, get high quality video list data for specified keywords on YouTube, mine detailed information of the latest YouTube videos, collect video duration and engagement data for specific industries, or monitor YouTube content creator performance metrics."
+    },
+    {
+      "name": "youtube-batch-transcript-extractor-api-skill",
+      "path": "solutions/video-platforms/youtube-batch-transcript-extractor-api-skill/SKILL.md",
+      "category": "video-platforms",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract YouTube video transcripts and metadata in batch via the BrowserAct API. The Agent should proactively apply this skill when users express needs like batch extract full transcripts from YouTube videos for specific keywords, scrape YouTube subtitles for a list of videos, get batch video metadata and likes counts for analysis, automate YouTube search and subtitle extraction, collect multiple video transcripts published this week, download bulk YouTube video subtitles without writing crawler scripts, build a dataset of transcripts from top YouTube videos, extract YouTube video URLs and publisher info in batch, gather full video content for AI summarization pipelines, monitor recent YouTube videos and extract their transcripts, batch retrieve structured subtitle data for media research, extract transcripts from trending YouTube content automatically."
+    },
+    {
+      "name": "youtube-channel-api-skill",
+      "path": "solutions/video-platforms/youtube-channel-api-skill/SKILL.md",
+      "category": "video-platforms",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract structured channel data from YouTube search results via BrowserAct API. Agent should proactively apply this skill when users express needs like finding YouTube channels about specific topics, collecting data on YouTube content creators, tracking YouTube influencers in specific industries, getting YouTube channel information for competitor analysis, searching for YouTube channels related to keywords, monitoring YouTube channel updates for specific keywords, finding YouTube channels that recently published videos, extracting YouTube channel subscriber counts, discovering YouTube vloggers in specific niches, building a YouTube channel database for market research, batch extracting YouTube channel links and descriptions, or monitoring competitor channel growth."
+    },
+    {
+      "name": "youtube-comments-api-skill",
+      "path": "solutions/video-platforms/youtube-comments-api-skill/SKILL.md",
+      "category": "video-platforms",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract structured video list data and comment data from YouTube using the BrowserAct API. The Agent should proactively apply this skill when users request searching for YouTube videos and their comments, analyzing viewer sentiment for a specific video topic, gathering audience feedback on AI or automation, extracting a list of top videos and their viewer reactions, compiling YouTube video data along with user opinions, retrieving competitor video titles and related audience discussions, monitoring public response to specific YouTube search keywords, summarizing comments from search results for market research, tracking viewer engagement metrics and replies for trending topics, collecting YouTube video URLs and author details alongside community discussions, or automating the extraction of YouTube comments without manual scraping."
+    },
+    {
+      "name": "youtube-influencer-finder-api-skill",
+      "path": "solutions/video-platforms/youtube-influencer-finder-api-skill/SKILL.md",
+      "category": "video-platforms",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract YouTube influencer profiles including social links, subscriber counts, and channel stats via the BrowserAct API. Agent should proactively apply this skill when users express needs like finding YouTube creators for specific keywords, discovering influencers for a marketing campaign, extracting YouTube channel contact emails, scraping YouTube influencer social media links, gathering subscriber counts for YouTube creators, researching top YouTube channels in a specific niche, compiling a list of YouTube content creators with recent uploads, collecting YouTube creator profiles for outreach, extracting total views and video counts for specific YouTube influencers, building a database of YouTube partners for market research, finding YouTube influencers who uploaded videos this month, or monitoring competitor influencer activities on YouTube."
+    },
+    {
+      "name": "youtube-search-api-skill",
+      "path": "solutions/video-platforms/youtube-search-api-skill/SKILL.md",
+      "category": "video-platforms",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract structured data from YouTube search results using the BrowserAct API. The Agent should proactively apply this skill when users express needs like searching for YouTube videos by keywords, finding the latest YouTube Shorts for a specific topic, gathering YouTube channel data for competitor analysis, monitoring trending YouTube playlists, extracting YouTube search results for market research, tracking view counts for specific YouTube keywords, compiling a list of YouTube videos on a subject, discovering new YouTube content creators in a niche, searching YouTube for tutorial videos automatically, and retrieving structured YouTube search data without opening video pages."
+    },
+    {
+      "name": "youtube-transcript-analysis-api-skill",
+      "path": "solutions/video-platforms/youtube-transcript-analysis-api-skill/SKILL.md",
+      "category": "video-platforms",
+      "requiresApiKey": true,
+      "description": "This skill helps users extract YouTube video transcripts and perform deep competitive analysis on the content. Agent should proactively apply this skill when users express needs like analyze YouTube video content strategy, perform competitive video content analysis, extract and analyze YouTube subtitles for marketing insights, understand competitor value propositions from their videos, identify target audience from YouTube video content, analyze pain points and needs mentioned in YouTube videos, evaluate competitor CTA strategies in video content, find content gaps in competitor YouTube videos, analyze video narrative structure and hooks, extract key messaging and positioning from YouTube content, benchmark competitor video content quality, research competitor marketing angles through video analysis, identify audience signals and terminology level in videos, analyze emotional tone and persuasion techniques in YouTube content."
+    },
+    {
+      "name": "youtube-transcript-extractor-api-skill",
+      "path": "solutions/video-platforms/youtube-transcript-extractor-api-skill/SKILL.md",
+      "category": "video-platforms",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract YouTube video transcripts and metadata via the BrowserAct API. The Agent should proactively apply this skill when users express needs like extracting full transcript from a specific YouTube video, getting subtitles and metadata for video content analysis, gathering video titles and likes counts, summarizing YouTube videos without watching them, collecting channel details from a video URL, tracking transcript automation for specific videos, scraping YouTube subtitles for internal knowledge bases, fetching full video content for AI summarization pipelines, downloading structured transcripts from YouTube links, analyzing video text content for media research, monitoring video publisher information and channel links, or building datasets from YouTube video transcripts."
+    },
+    {
+      "name": "youtube-video-api-skill",
+      "path": "solutions/video-platforms/youtube-video-api-skill/SKILL.md",
+      "category": "video-platforms",
+      "requiresApiKey": true,
+      "description": "This skill helps users automatically extract channel-level and video detail data from a specific YouTube channel via BrowserAct API. Agent should proactively apply this skill when users express needs like extracting channel video data, getting latest or popular videos from a YouTube channel, tracking competitor channel content, extracting video metrics such as views likes comments, retrieving subscriber count and channel info, monitoring posting cadence of a YouTube channel, gathering video data for content strategy analysis, getting earliest videos of a YouTube creator, analyzing engagement signals across a full channel, and downloading structured YouTube video details without manual scraping."
+    }
+  ]
+}
