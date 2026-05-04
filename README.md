@@ -298,6 +298,51 @@ curl -fsS -H "Authorization: Bearer nvapi-..." \
 
 ---
 
+## Ollama (Local & Cloud)
+
+Поддерживается провайдер **Ollama** — запуск LLM локально либо через Ollama Cloud
+(`ollama.com`). Под капотом используется OpenAI-совместимый эндпоинт
+`/v1/chat/completions` (поэтому работают tools, vision, streaming) плюс native
+эндпоинты `/api/tags`, `/api/pull`, `/api/version` для управления моделями.
+
+1. Установите Ollama: <https://ollama.com/download>, затем `ollama serve`.
+2. В Agent Pro: *Настройки → Нейросеть → Провайдер → Ollama (Local & Cloud)*.
+3. Кнопки `Local` / `Cloud (ollama.com)` подставляют корректный Base URL
+   (`http://localhost:11434` или `https://ollama.com`).
+4. Для Ollama Cloud укажите ключ из <https://ollama.com> → *Settings → API Keys*.
+5. Кнопка **Проверить** — health-check (`/api/version` + список моделей).
+6. Поле **Pull / скачать модель** — стримит прогресс установки прямо из UI
+   (например, `llama3.2:3b`, `gpt-oss:20b`, `qwen3:4b`).
+7. Опции: `keep_alive` (как долго держать модель в памяти), `stream`
+   (SSE-стриминг ответа), `Show thinking` (отображение `reasoning_content`
+   для моделей `gpt-oss`, `deepseek-r1`, `qwen3` и т.п.).
+
+---
+
+## Кастомные провайдеры (любой OpenAI-совместимый сервер)
+
+В *Настройках → Нейросеть → Кастомные провайдеры* можно вручную добавить любой
+OpenAI-совместимый endpoint: TogetherAI, Anyscale, Fireworks, Cerebras,
+Sambanova, LM Studio, vLLM, llama.cpp/llamafile, локальные FastAPI-обёртки и т.п.
+
+Поля формы:
+
+* **Название** — отображается в выпадающем списке провайдеров.
+* **ID** — slug, авто-генерируется из названия.
+* **Base URL** — корень API (например, `https://api.together.xyz/v1`).
+* **API ключ** — опционально (обычно `sk-...`).
+* **Chat path** — путь chat-эндпоинта (по умолчанию `/chat/completions`).
+* **Models path** — путь GET-списка моделей (по умолчанию `/models`).
+* **Модель по умолчанию** — fallback, если эндпоинт `/models` недоступен.
+* **Доп. заголовки** — произвольные пары `key: value`.
+
+Конфигурация хранится в `localStorage["agent_custom_providers"]`, ключи —
+в `agent_key_custom:<id>`. После сохранения провайдер появляется в списке
+*Провайдер* и поддерживает те же tools/function calling/vision, что и
+встроенные OpenAI-совместимые провайдеры.
+
+---
+
 ## Запуск отдельных сервисов
 
 Удобно для отладки. Все четыре нужны вместе, но можно запустить любой по отдельности:
