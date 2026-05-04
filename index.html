@@ -4717,16 +4717,22 @@ button:disabled, .icon-btn:disabled, input:disabled, textarea:disabled {
           <div class="setting-row">
             <label>Провайдер</label>
             <select id="provider" class="input-modern">
-              <option value="openai">OpenAI</option>
-              <option value="nvidia">NVIDIA NIM (build.nvidia.com)</option>
-              <option value="openrouter">OpenRouter</option>
-              <option value="groq">Groq</option>
-              <option value="mistral">Mistral AI</option>
-              <option value="gemini">Google Gemini</option>
-              <option value="glm">GLM (Z.AI)</option>
-              <option value="deepseek">DeepSeek Free (ds2api)</option>
-              <option value="qwen">Qwen (aikit.club)</option>
-              <option value="puter">Puter.js</option>
+              <optgroup label="Облачные" id="providerGroupCloud">
+                <option value="openai">OpenAI</option>
+                <option value="nvidia">NVIDIA NIM (build.nvidia.com)</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="groq">Groq</option>
+                <option value="mistral">Mistral AI</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="glm">GLM (Z.AI)</option>
+                <option value="deepseek">DeepSeek Free (ds2api)</option>
+                <option value="qwen">Qwen (aikit.club)</option>
+                <option value="puter">Puter.js</option>
+              </optgroup>
+              <optgroup label="Локальные / self-hosted" id="providerGroupLocal">
+                <option value="ollama">Ollama (Local & Cloud)</option>
+              </optgroup>
+              <optgroup label="Кастомные" id="providerGroupCustom" style="display:none;"></optgroup>
             </select>
           </div>
 
@@ -4989,6 +4995,133 @@ button:disabled, .icon-btn:disabled, input:disabled, textarea:disabled {
               💚 <b>NVIDIA NIM API</b> — бесплатный доступ к топ-моделям (Llama, Nemotron, DeepSeek-R1, Qwen, Mistral, Gemma, Phi и др.).<br>
               Получите ключ <code>nvapi-...</code> на <a href="https://build.nvidia.com" target="_blank" rel="noopener" style="color:var(--accent);">build.nvidia.com</a> → <i>Get API Key</i>.<br>
               Endpoint OpenAI-совместимый (<code>/v1/chat/completions</code>, <code>/v1/models</code>) — можно подменить Base URL на свой self-hosted NIM.
+            </div>
+          </div>
+
+          <!-- Ollama (Local & Cloud) settings -->
+          <div class="settings-group" id="ollamaSettingsGroup" style="display:none;">
+            <label style="display:flex;align-items:center;gap:6px;">
+              <i data-lucide="server" style="width:14px;height:14px;color:var(--text-2);"></i>
+              Ollama Base URL
+            </label>
+            <input id="ollamaBase" type="text" placeholder="http://localhost:11434" />
+            <div style="margin-top:5px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <button id="ollamaPresetLocal" type="button" style="padding:6px 10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-3);color:var(--text-1);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-sans);">
+                <i data-lucide="laptop" style="width:12px;height:12px;"></i> Local
+              </button>
+              <button id="ollamaPresetCloud" type="button" style="padding:6px 10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-3);color:var(--text-1);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-sans);">
+                <i data-lucide="cloud" style="width:12px;height:12px;"></i> Cloud (ollama.com)
+              </button>
+              <button id="ollamaTestBtn" type="button" style="flex:1;min-width:100px;padding:6px 10px;border-radius:var(--r-md);border:1px solid var(--border-focus);background:var(--bg-3);color:var(--text-0);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;justify-content:center;gap:5px;">
+                <i data-lucide="wifi" style="width:12px;height:12px;"></i> Проверить
+              </button>
+              <span id="ollamaTestStatus" style="font-size:11px;color:var(--text-2);"></span>
+            </div>
+
+            <!-- Ollama keep_alive -->
+            <div style="margin-top:10px;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-1);margin-bottom:6px;">
+                <i data-lucide="timer" style="width:14px;height:14px;color:var(--text-2);"></i>
+                keep_alive (как долго держать модель в памяти)
+              </label>
+              <input id="ollamaKeepAlive" type="text" placeholder="5m" style="width:100%;" />
+              <div style="margin-top:4px;font-size:10px;color:var(--text-2);line-height:1.4;">
+                Поддерживаются <code>5m</code>, <code>1h</code>, <code>0</code> (выгрузить сразу), <code>-1</code> (держать вечно). Передаётся как <code>keep_alive</code> в каждом запросе к Ollama.
+              </div>
+            </div>
+
+            <!-- Ollama streaming -->
+            <div style="margin-top:10px;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-1);margin-bottom:6px;">
+                <i data-lucide="zap" style="width:14px;height:14px;color:var(--text-2);"></i>
+                Стриминг ответов
+              </label>
+              <div class="toggle-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ollamaStream">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label">stream=true (быстрее «время до первого токена»)</span>
+              </div>
+              <div style="margin-top:4px;font-size:10px;color:var(--text-2);line-height:1.4;">
+                Включает SSE-стриминг через <code>/v1/chat/completions</code>. Tools работают, но при ошибках стриминга на старых моделях — выключите.
+              </div>
+            </div>
+
+            <!-- Ollama thinking -->
+            <div style="margin-top:10px;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-1);margin-bottom:6px;">
+                <i data-lucide="brain" style="width:14px;height:14px;color:var(--text-2);"></i>
+                Режим размышлений (think)
+              </label>
+              <div class="toggle-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ollamaShowThinking" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label">Показывать цепочку рассуждений</span>
+              </div>
+              <div style="margin-top:4px;font-size:10px;color:var(--text-2);line-height:1.4;">
+                Для thinking-моделей Ollama (<code>gpt-oss</code>, <code>deepseek-r1</code>, <code>qwen3</code> и др.) — поле <code>reasoning_content</code> отображается как «размышление» перед ответом.
+              </div>
+            </div>
+
+            <!-- Ollama: Pull model -->
+            <div style="margin-top:10px;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-1);margin-bottom:6px;">
+                <i data-lucide="download" style="width:14px;height:14px;color:var(--text-2);"></i>
+                Pull / скачать модель
+              </label>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input id="ollamaPullModel" type="text" placeholder="например, llama3.2:3b" style="flex:1;" />
+                <button id="ollamaPullBtn" type="button" style="padding:6px 12px;border-radius:var(--r-md);border:1px solid var(--success-border);background:var(--success-bg);color:var(--success);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;gap:5px;">
+                  <i data-lucide="download" style="width:12px;height:12px;"></i> Pull
+                </button>
+              </div>
+              <div id="ollamaPullStatus" style="margin-top:6px;font-size:11px;color:var(--text-2);min-height:14px;"></div>
+            </div>
+
+            <div style="margin-top:10px;padding:8px;background:var(--info-bg);border:1px solid rgba(88,166,255,0.18);border-radius:var(--r-sm);font-size:11px;color:var(--text-1);line-height:1.6;">
+              🦙 <b>Ollama</b> — запуск LLM локально (или через ollama.com Cloud).<br>
+              Установка: <a href="https://ollama.com/download" target="_blank" rel="noopener" style="color:var(--accent);">ollama.com/download</a>, далее <code>ollama serve</code>.<br>
+              Endpoint OpenAI-совместимый (<code>/v1/chat/completions</code>, <code>/v1/models</code>) + native (<code>/api/chat</code>, <code>/api/tags</code>, <code>/api/pull</code>).<br>
+              API-ключ требуется только для Ollama Cloud (<a href="https://ollama.com" target="_blank" rel="noopener" style="color:var(--accent);">ollama.com</a> → Settings → API Keys).
+            </div>
+          </div>
+
+          <!-- Custom provider settings (shown when a custom provider is selected) -->
+          <div class="settings-group" id="customProviderActiveGroup" style="display:none;">
+            <label style="display:flex;align-items:center;gap:6px;">
+              <i data-lucide="plug" style="width:14px;height:14px;color:var(--text-2);"></i>
+              <span id="customProviderActiveName">Кастомный провайдер</span>
+            </label>
+            <div id="customProviderActiveInfo" style="font-size:11px;color:var(--text-2);line-height:1.5;margin-bottom:8px;"></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button id="customProviderEditBtn" type="button" style="flex:1;padding:6px 10px;border-radius:var(--r-md);border:1px solid var(--border-focus);background:var(--bg-3);color:var(--text-0);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;justify-content:center;gap:5px;">
+                <i data-lucide="edit" style="width:12px;height:12px;"></i> Редактировать
+              </button>
+              <button id="customProviderTestBtn" type="button" style="flex:1;padding:6px 10px;border-radius:var(--r-md);border:1px solid var(--border-focus);background:var(--bg-3);color:var(--text-0);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;justify-content:center;gap:5px;">
+                <i data-lucide="wifi" style="width:12px;height:12px;"></i> Проверить
+              </button>
+              <button id="customProviderDeleteBtn" type="button" style="padding:6px 10px;border-radius:var(--r-md);border:1px solid var(--error-border,#ff5f5f);background:var(--bg-3);color:var(--error,#ff7676);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;justify-content:center;gap:5px;">
+                <i data-lucide="trash-2" style="width:12px;height:12px;"></i>
+              </button>
+            </div>
+            <span id="customProviderTestStatus" style="display:block;margin-top:6px;font-size:11px;color:var(--text-2);"></span>
+          </div>
+
+          <!-- Custom providers manager (always visible at bottom of provider section) -->
+          <div class="settings-group" id="customProvidersManagerGroup" style="margin-top:10px;">
+            <label style="display:flex;align-items:center;gap:6px;">
+              <i data-lucide="puzzle" style="width:14px;height:14px;color:var(--text-2);"></i>
+              Кастомные провайдеры (OpenAI-совместимые)
+            </label>
+            <div id="customProvidersList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;"></div>
+            <button id="customProvidersAddBtn" type="button" style="width:100%;padding:7px 12px;border-radius:var(--r-md);border:1px dashed var(--border-focus);background:transparent;color:var(--text-1);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;justify-content:center;gap:5px;">
+              <i data-lucide="plus" style="width:13px;height:13px;"></i> Добавить кастомного провайдера
+            </button>
+            <div style="margin-top:6px;font-size:10px;color:var(--text-2);line-height:1.4;">
+              Любой OpenAI-совместимый сервер: TogetherAI, Anyscale, Fireworks, Cerebras, Sambanova, LM Studio, vLLM, llama.cpp/llamafile, ChatGLM, локальные FastAPI-обёртки и т.д.
             </div>
           </div>
 
@@ -6025,6 +6158,21 @@ function saveSettings() {
     document.getElementById('nvidiaUseBuiltinProxy').checked.toString());
   localStorage.setItem('agent_nvidia_show_thinking', document.getElementById('nvidiaShowThinking').checked.toString());
   localStorage.setItem('agent_nvidia_stream', document.getElementById('nvidiaStream').checked.toString());
+  // Ollama settings
+  const ollamaBaseEl = document.getElementById('ollamaBase');
+  if (ollamaBaseEl) {
+    const ollamaBase = (ollamaBaseEl.value || '').trim();
+    if (ollamaBase) localStorage.setItem('agent_ollama_base', ollamaBase);
+  }
+  const ollamaKeepAliveEl = document.getElementById('ollamaKeepAlive');
+  if (ollamaKeepAliveEl) {
+    const ka = (ollamaKeepAliveEl.value || '').trim();
+    if (ka) localStorage.setItem('agent_ollama_keep_alive', ka);
+  }
+  const ollamaStreamEl = document.getElementById('ollamaStream');
+  if (ollamaStreamEl) localStorage.setItem('agent_ollama_stream', ollamaStreamEl.checked.toString());
+  const ollamaShowThinkingEl = document.getElementById('ollamaShowThinking');
+  if (ollamaShowThinkingEl) localStorage.setItem('agent_ollama_show_thinking', ollamaShowThinkingEl.checked.toString());
   document.dispatchEvent(new CustomEvent('settings:saved'));
 }
 function getCurrentKey() {
@@ -6054,6 +6202,11 @@ function updateKeyIndicator() {
       input.placeholder = 'API ключ из config.json (ds2api)';
     } else if (provider === 'nvidia') {
       input.placeholder = 'nvapi-...';
+    } else if (provider === 'ollama') {
+      input.placeholder = 'Опционально: ключ для Ollama Cloud / закрытого сервера';
+    } else if (isCustomProvider(provider)) {
+      const cfg = getCustomProvider(provider);
+      input.placeholder = cfg ? `API ключ для ${cfg.name} (опционально)` : 'API ключ (опционально)';
     } else {
       input.placeholder = 'Вставьте ключ';
     }
@@ -6075,11 +6228,20 @@ function loadSettings() {
   const delaySeconds = parseInt(localStorage.getItem('agent_delay_seconds')) || 10;
   const ttsProvider = localStorage.getItem('agent_tts_provider') || 'openai';
   const ttsVoice = localStorage.getItem('agent_tts_voice') || 'nova';
-  if (provider) document.getElementById('provider').value = provider;
-  const isPuter = document.getElementById('provider').value === 'puter';
-  const isQwen = document.getElementById('provider').value === 'qwen';
-  const isDeepSeek = document.getElementById('provider').value === 'deepseek';
-  const isNvidia = document.getElementById('provider').value === 'nvidia';
+  // Перестраиваем select провайдеров — добавляем кастомные в optgroup перед чтением value.
+  if (typeof rebuildCustomProvidersUI === 'function') rebuildCustomProvidersUI();
+  if (provider) {
+    // Если сохранён custom: провайдер, но он удалён — fallback на openai.
+    const opt = Array.from(document.getElementById('provider').options).find(o => o.value === provider);
+    document.getElementById('provider').value = opt ? provider : 'openai';
+  }
+  const curProvider = document.getElementById('provider').value;
+  const isPuter = curProvider === 'puter';
+  const isQwen = curProvider === 'qwen';
+  const isDeepSeek = curProvider === 'deepseek';
+  const isNvidia = curProvider === 'nvidia';
+  const isOllama = curProvider === 'ollama';
+  const isCustom = isCustomProvider(curProvider);
   document.getElementById('apiKeyGroup').style.display = isPuter ? 'none' : '';
   document.getElementById('puterAuthGroup').style.display = isPuter ? '' : 'none';
   document.getElementById('qwenBaseGroup').style.display = isQwen ? '' : 'none';
@@ -6090,6 +6252,20 @@ function loadSettings() {
   document.getElementById('qwenVideoGenGroup').style.display = isQwen ? '' : 'none';
   document.getElementById('qwenDeleteChatsGroup').style.display = isQwen ? '' : 'none';
   document.getElementById('nvidiaSettingsGroup').style.display = isNvidia ? '' : 'none';
+  const ollamaGroup = document.getElementById('ollamaSettingsGroup');
+  if (ollamaGroup) ollamaGroup.style.display = isOllama ? '' : 'none';
+  const customActiveGroup = document.getElementById('customProviderActiveGroup');
+  if (customActiveGroup) customActiveGroup.style.display = isCustom ? '' : 'none';
+  if (isCustom && typeof updateCustomProviderActiveUI === 'function') updateCustomProviderActiveUI();
+  // Ollama: подтянуть сохранённые поля при первой инициализации
+  const ollamaBaseInput = document.getElementById('ollamaBase');
+  if (ollamaBaseInput) ollamaBaseInput.value = localStorage.getItem('agent_ollama_base') || 'http://localhost:11434';
+  const ollamaKeepAliveInput = document.getElementById('ollamaKeepAlive');
+  if (ollamaKeepAliveInput) ollamaKeepAliveInput.value = localStorage.getItem('agent_ollama_keep_alive') || '5m';
+  const ollamaStreamInput = document.getElementById('ollamaStream');
+  if (ollamaStreamInput) ollamaStreamInput.checked = localStorage.getItem('agent_ollama_stream') === 'true';
+  const ollamaShowThinkingInput = document.getElementById('ollamaShowThinking');
+  if (ollamaShowThinkingInput) ollamaShowThinkingInput.checked = localStorage.getItem('agent_ollama_show_thinking') !== 'false';
   // Qwen AI Kit settings
   const savedQwenBase = localStorage.getItem('agent_qwen_base') || 'https://qwen.aikit.club';
   document.getElementById('qwenBase').value = savedQwenBase;
@@ -6190,6 +6366,8 @@ document.getElementById('provider').addEventListener('change', () => {
   const isQwen = provider === 'qwen';
   const isDeepSeek = provider === 'deepseek';
   const isNvidia = provider === 'nvidia';
+  const isOllama = provider === 'ollama';
+  const isCustom = isCustomProvider(provider);
   document.getElementById('apiKeyGroup').style.display = isPuter ? 'none' : '';
   document.getElementById('puterAuthGroup').style.display = isPuter ? '' : 'none';
   document.getElementById('qwenBaseGroup').style.display = isQwen ? '' : 'none';
@@ -6201,6 +6379,11 @@ document.getElementById('provider').addEventListener('change', () => {
   document.getElementById('qwenDeleteChatsGroup').style.display = isQwen ? '' : 'none';
   document.getElementById('deepseekBaseGroup').style.display = isDeepSeek ? '' : 'none';
   document.getElementById('nvidiaSettingsGroup').style.display = isNvidia ? '' : 'none';
+  const ollamaGroup2 = document.getElementById('ollamaSettingsGroup');
+  if (ollamaGroup2) ollamaGroup2.style.display = isOllama ? '' : 'none';
+  const customActiveGroup2 = document.getElementById('customProviderActiveGroup');
+  if (customActiveGroup2) customActiveGroup2.style.display = isCustom ? '' : 'none';
+  if (isCustom && typeof updateCustomProviderActiveUI === 'function') updateCustomProviderActiveUI();
   if (!isPuter) {
     const key = getCurrentKey();
     document.getElementById('apiKey').value = key;
@@ -6286,6 +6469,406 @@ document.getElementById('nvidiaTestBtn').addEventListener('click', async () => {
     statusEl.style.color = 'var(--error)';
   }
 });
+
+// ═══════════ Ollama — обработчики ═══════════
+(function setupOllamaHandlers() {
+  const baseEl = document.getElementById('ollamaBase');
+  if (!baseEl) return;
+  baseEl.addEventListener('change', () => { saveSettings(); });
+  const presetLocal = document.getElementById('ollamaPresetLocal');
+  if (presetLocal) presetLocal.addEventListener('click', () => {
+    baseEl.value = 'http://localhost:11434';
+    saveSettings();
+    loadModels();
+  });
+  const presetCloud = document.getElementById('ollamaPresetCloud');
+  if (presetCloud) presetCloud.addEventListener('click', () => {
+    baseEl.value = 'https://ollama.com';
+    saveSettings();
+    loadModels();
+  });
+  const keepAlive = document.getElementById('ollamaKeepAlive');
+  if (keepAlive) keepAlive.addEventListener('change', saveSettings);
+  const stream = document.getElementById('ollamaStream');
+  if (stream) stream.addEventListener('change', saveSettings);
+  const showThinking = document.getElementById('ollamaShowThinking');
+  if (showThinking) showThinking.addEventListener('change', saveSettings);
+
+  const testBtn = document.getElementById('ollamaTestBtn');
+  if (testBtn) testBtn.addEventListener('click', async () => {
+    const statusEl = document.getElementById('ollamaTestStatus');
+    statusEl.textContent = '⏳ Проверка...';
+    statusEl.style.color = 'var(--text-2)';
+    try {
+      const base = getOllamaBase();
+      const key = getCurrentKey();
+      const ver = await ollamaPing(base, key).catch(async () => {
+        // fallback: Cloud /api/version или /v1/models
+        const r = await fetch(base + '/v1/models', { headers: ollamaHeaders(key) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return { version: '(unknown)' };
+      });
+      let count = '';
+      try {
+        const list = await ollamaListModels(base, key);
+        count = ` · ${list.length} моделей`;
+      } catch {
+        try {
+          const r = await fetch(base + '/v1/models', { headers: ollamaHeaders(key) });
+          if (r.ok) {
+            const data = await r.json();
+            const arr = data.data || [];
+            count = ` · ${arr.length} моделей`;
+          }
+        } catch {}
+      }
+      statusEl.textContent = `✓ Подключено (v${ver.version || '?'}${count})`;
+      statusEl.style.color = 'var(--success)';
+      loadModels();
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e);
+      statusEl.textContent = '✗ ' + msg;
+      statusEl.style.color = 'var(--error)';
+    }
+  });
+
+  const pullBtn = document.getElementById('ollamaPullBtn');
+  if (pullBtn) pullBtn.addEventListener('click', async () => {
+    const inp = document.getElementById('ollamaPullModel');
+    const status = document.getElementById('ollamaPullStatus');
+    const name = (inp.value || '').trim();
+    if (!name) {
+      status.textContent = '⚠ Введите имя модели (например, llama3.2:3b)';
+      status.style.color = 'var(--warning)';
+      return;
+    }
+    pullBtn.disabled = true;
+    status.style.color = 'var(--text-2)';
+    status.textContent = `⏳ Pull ${name}...`;
+    try {
+      await ollamaPullModel(name, getOllamaBase(), getCurrentKey(), evt => {
+        if (evt.status) {
+          let line = evt.status;
+          if (evt.completed != null && evt.total != null && evt.total > 0) {
+            const pct = Math.round((evt.completed / evt.total) * 100);
+            line += ` ${pct}% (${(evt.completed / 1e6).toFixed(1)}/${(evt.total / 1e6).toFixed(1)} MB)`;
+          }
+          status.textContent = '⏳ ' + line;
+        }
+        if (evt.error) {
+          throw new Error(evt.error);
+        }
+      });
+      status.textContent = '✓ Готово — модель установлена';
+      status.style.color = 'var(--success)';
+      loadModels();
+    } catch (e) {
+      status.textContent = '✗ ' + (e.message || e);
+      status.style.color = 'var(--error)';
+    } finally {
+      pullBtn.disabled = false;
+    }
+  });
+})();
+
+// ═══════════ Кастомные провайдеры — UI/CRUD ═══════════
+function rebuildCustomProvidersUI() {
+  const optgroup = document.getElementById('providerGroupCustom');
+  const list = document.getElementById('customProvidersList');
+  if (!optgroup || !list) return;
+
+  // Перестраиваем optgroup
+  while (optgroup.firstChild) optgroup.removeChild(optgroup.firstChild);
+  const providers = getCustomProviders();
+  if (!providers.length) {
+    optgroup.style.display = 'none';
+  } else {
+    optgroup.style.display = '';
+    providers.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = CUSTOM_PROVIDER_PREFIX + p.id;
+      opt.textContent = p.name + ' (custom)';
+      optgroup.appendChild(opt);
+    });
+  }
+
+  // Перестраиваем список под кнопкой "Добавить"
+  list.innerHTML = '';
+  if (!providers.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'font-size:11px;color:var(--text-2);padding:6px 8px;background:var(--bg-3);border-radius:var(--r-sm);';
+    empty.textContent = 'Пока нет кастомных провайдеров.';
+    list.appendChild(empty);
+    return;
+  }
+  providers.forEach(p => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--r-sm);';
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0;';
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:11px;font-weight:600;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    title.textContent = p.name;
+    const sub = document.createElement('div');
+    sub.style.cssText = 'font-size:10px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    sub.textContent = p.baseUrl || '(нет URL)';
+    info.appendChild(title);
+    info.appendChild(sub);
+    row.appendChild(info);
+
+    const useBtn = document.createElement('button');
+    useBtn.type = 'button';
+    useBtn.title = 'Выбрать провайдера';
+    useBtn.style.cssText = 'padding:4px 8px;border-radius:var(--r-sm);border:1px solid var(--border-focus);background:var(--bg-2);color:var(--text-1);font-size:10px;font-weight:600;cursor:pointer;';
+    useBtn.textContent = 'Выбрать';
+    useBtn.addEventListener('click', () => {
+      document.getElementById('provider').value = CUSTOM_PROVIDER_PREFIX + p.id;
+      document.getElementById('provider').dispatchEvent(new Event('change'));
+    });
+    row.appendChild(useBtn);
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.title = 'Редактировать';
+    editBtn.style.cssText = 'padding:4px 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg-2);color:var(--text-1);font-size:10px;font-weight:600;cursor:pointer;';
+    editBtn.innerHTML = '<i data-lucide="edit-3" style="width:11px;height:11px;"></i>';
+    editBtn.addEventListener('click', () => openCustomProviderModal(p));
+    row.appendChild(editBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.title = 'Удалить';
+    delBtn.style.cssText = 'padding:4px 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg-2);color:var(--error,#ff7676);font-size:10px;font-weight:600;cursor:pointer;';
+    delBtn.innerHTML = '<i data-lucide="trash-2" style="width:11px;height:11px;"></i>';
+    delBtn.addEventListener('click', () => {
+      if (!confirm(`Удалить провайдера «${p.name}»?`)) return;
+      deleteCustomProvider(p.id);
+    });
+    row.appendChild(delBtn);
+
+    list.appendChild(row);
+  });
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function deleteCustomProvider(id) {
+  const arr = getCustomProviders().filter(p => p.id !== id);
+  saveCustomProviders(arr);
+  localStorage.removeItem(`agent_key_custom:${id}`);
+  rebuildCustomProvidersUI();
+  // Если удалённый провайдер был выбран — переключаем на openai.
+  const cur = document.getElementById('provider').value;
+  if (cur === CUSTOM_PROVIDER_PREFIX + id) {
+    document.getElementById('provider').value = 'openai';
+    document.getElementById('provider').dispatchEvent(new Event('change'));
+  }
+  setStatus('✅ Провайдер удалён', 'ok');
+}
+
+function updateCustomProviderActiveUI() {
+  const provider = document.getElementById('provider').value;
+  if (!isCustomProvider(provider)) return;
+  const cfg = getCustomProvider(provider);
+  if (!cfg) return;
+  const nameEl = document.getElementById('customProviderActiveName');
+  const infoEl = document.getElementById('customProviderActiveInfo');
+  if (nameEl) nameEl.textContent = cfg.name;
+  if (infoEl) {
+    infoEl.innerHTML =
+      `<code>${escapeHtmlSafe(cfg.baseUrl || '')}</code><br>` +
+      `Chat: <code>${escapeHtmlSafe(cfg.chatPath || '/chat/completions')}</code>` +
+      ` · Models: <code>${escapeHtmlSafe(cfg.modelsPath || '/models')}</code>` +
+      (cfg.defaultModel ? ` · default: <code>${escapeHtmlSafe(cfg.defaultModel)}</code>` : '');
+  }
+}
+
+function escapeHtmlSafe(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function openCustomProviderModal(existing) {
+  const isEdit = !!(existing && existing.id);
+  const data = existing || { id: '', name: '', baseUrl: '', chatPath: '/chat/completions', modelsPath: '/models', defaultModel: '', headers: [] };
+  const headerRows = (data.headers || []).map((h, i) => `
+    <div class="hdr-row" style="display:flex;gap:6px;margin-bottom:4px;">
+      <input class="hdr-k" data-i="${i}" type="text" placeholder="Header" value="${escapeHtmlSafe(h.k || '')}" style="flex:1;" />
+      <input class="hdr-v" data-i="${i}" type="text" placeholder="Value" value="${escapeHtmlSafe(h.v || '')}" style="flex:1;" />
+      <button class="hdr-del" data-i="${i}" type="button" style="padding:4px 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg-2);color:var(--error,#ff7676);">×</button>
+    </div>
+  `).join('');
+  const keyVal = isEdit ? (localStorage.getItem(`agent_key_custom:${data.id}`) || '') : '';
+
+  const html = `
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;">Название (отображается в списке)</label>
+        <input id="cpName" type="text" placeholder="Например, Together AI" value="${escapeHtmlSafe(data.name)}" />
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;">ID (slug для localStorage; ${isEdit ? '<b>нельзя менять</b>' : 'auto из названия'})</label>
+        <input id="cpId" type="text" placeholder="together-ai" value="${escapeHtmlSafe(data.id)}" ${isEdit ? 'disabled' : ''} />
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;">Base URL (без хвостового /)</label>
+        <input id="cpBase" type="text" placeholder="https://api.together.xyz/v1" value="${escapeHtmlSafe(data.baseUrl)}" />
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;">API ключ (опционально)</label>
+        <input id="cpKey" type="password" placeholder="sk-..." value="${escapeHtmlSafe(keyVal)}" />
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;">
+          <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;">Chat path</label>
+          <input id="cpChatPath" type="text" placeholder="/chat/completions" value="${escapeHtmlSafe(data.chatPath || '/chat/completions')}" />
+        </div>
+        <div style="flex:1;">
+          <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;">Models path</label>
+          <input id="cpModelsPath" type="text" placeholder="/models" value="${escapeHtmlSafe(data.modelsPath || '/models')}" />
+        </div>
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;">Модель по умолчанию (на случай, если /models не работает)</label>
+        <input id="cpDefaultModel" type="text" placeholder="meta-llama/Llama-3-8b-chat-hf" value="${escapeHtmlSafe(data.defaultModel || '')}" />
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;">Доп. заголовки</label>
+        <div id="cpHeaders">${headerRows}</div>
+        <button id="cpHdrAdd" type="button" style="margin-top:4px;padding:4px 10px;border-radius:var(--r-sm);border:1px dashed var(--border-focus);background:transparent;color:var(--text-1);font-size:11px;cursor:pointer;">+ заголовок</button>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+        <button id="cpCancel" type="button" style="padding:8px 14px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-3);color:var(--text-1);font-size:12px;font-weight:600;cursor:pointer;">Отмена</button>
+        <button id="cpSave" type="button" style="padding:8px 14px;border-radius:var(--r-md);border:1px solid var(--success-border);background:var(--success-bg);color:var(--success);font-size:12px;font-weight:600;cursor:pointer;">${isEdit ? 'Сохранить' : 'Добавить'}</button>
+      </div>
+      <div id="cpStatus" style="font-size:11px;color:var(--text-2);min-height:14px;"></div>
+    </div>
+  `;
+  showModal(isEdit ? `Редактировать «${data.name}»` : 'Добавить кастомного провайдера', html);
+
+  // Slug auto на name
+  const nameInp = document.getElementById('cpName');
+  const idInp = document.getElementById('cpId');
+  if (!isEdit && nameInp && idInp) {
+    nameInp.addEventListener('input', () => { idInp.value = slugifyProviderId(nameInp.value); });
+  }
+
+  // Header rows
+  const hdrContainer = document.getElementById('cpHeaders');
+  function rerenderHeaders(arr) {
+    hdrContainer.innerHTML = arr.map((h, i) => `
+      <div class="hdr-row" style="display:flex;gap:6px;margin-bottom:4px;">
+        <input class="hdr-k" data-i="${i}" type="text" placeholder="Header" value="${escapeHtmlSafe(h.k || '')}" style="flex:1;" />
+        <input class="hdr-v" data-i="${i}" type="text" placeholder="Value" value="${escapeHtmlSafe(h.v || '')}" style="flex:1;" />
+        <button class="hdr-del" data-i="${i}" type="button" style="padding:4px 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg-2);color:var(--error,#ff7676);">×</button>
+      </div>
+    `).join('');
+    Array.from(hdrContainer.querySelectorAll('.hdr-del')).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.i, 10);
+        arr.splice(i, 1);
+        rerenderHeaders(arr);
+      });
+    });
+  }
+  const headersWorking = (data.headers || []).slice();
+  rerenderHeaders(headersWorking);
+  document.getElementById('cpHdrAdd').addEventListener('click', () => {
+    headersWorking.push({ k: '', v: '' });
+    rerenderHeaders(headersWorking);
+  });
+
+  document.getElementById('cpCancel').addEventListener('click', hideModal);
+  document.getElementById('cpSave').addEventListener('click', () => {
+    const name = (document.getElementById('cpName').value || '').trim();
+    let id = (document.getElementById('cpId').value || '').trim();
+    if (!name) {
+      document.getElementById('cpStatus').textContent = '⚠ Введите название';
+      return;
+    }
+    if (!id) id = slugifyProviderId(name);
+    id = slugifyProviderId(id);
+    const baseUrl = (document.getElementById('cpBase').value || '').trim().replace(/\/+$/, '');
+    if (!baseUrl) {
+      document.getElementById('cpStatus').textContent = '⚠ Введите Base URL';
+      return;
+    }
+    const headersOut = Array.from(hdrContainer.querySelectorAll('.hdr-row'))
+      .map(row => ({
+        k: (row.querySelector('.hdr-k')?.value || '').trim(),
+        v: (row.querySelector('.hdr-v')?.value || '').trim(),
+      }))
+      .filter(h => h.k);
+    const cfg = {
+      id,
+      name,
+      baseUrl,
+      chatPath: (document.getElementById('cpChatPath').value || '/chat/completions').trim() || '/chat/completions',
+      modelsPath: (document.getElementById('cpModelsPath').value || '/models').trim() || '/models',
+      defaultModel: (document.getElementById('cpDefaultModel').value || '').trim(),
+      headers: headersOut,
+    };
+    const arr = getCustomProviders();
+    const i = arr.findIndex(p => p.id === id);
+    if (i >= 0) arr[i] = cfg; else arr.push(cfg);
+    saveCustomProviders(arr);
+    const apiKey = (document.getElementById('cpKey').value || '').trim();
+    if (apiKey) {
+      localStorage.setItem(`agent_key_custom:${id}`, apiKey);
+    } else if (!isEdit) {
+      // Новый провайдер без ключа — гарантируем, что нет «висячего» старого ключа.
+      localStorage.removeItem(`agent_key_custom:${id}`);
+    }
+    rebuildCustomProvidersUI();
+    hideModal();
+    setStatus('✅ Провайдер сохранён', 'ok');
+  });
+}
+
+(function setupCustomProvidersHandlers() {
+  const addBtn = document.getElementById('customProvidersAddBtn');
+  if (addBtn) addBtn.addEventListener('click', () => openCustomProviderModal(null));
+
+  const editBtn = document.getElementById('customProviderEditBtn');
+  if (editBtn) editBtn.addEventListener('click', () => {
+    const cur = document.getElementById('provider').value;
+    const cfg = getCustomProvider(cur);
+    if (cfg) openCustomProviderModal(cfg);
+  });
+
+  const delBtn = document.getElementById('customProviderDeleteBtn');
+  if (delBtn) delBtn.addEventListener('click', () => {
+    const cur = document.getElementById('provider').value;
+    const cfg = getCustomProvider(cur);
+    if (!cfg) return;
+    if (!confirm(`Удалить провайдера «${cfg.name}»?`)) return;
+    deleteCustomProvider(cfg.id);
+  });
+
+  const testBtn = document.getElementById('customProviderTestBtn');
+  if (testBtn) testBtn.addEventListener('click', async () => {
+    const cur = document.getElementById('provider').value;
+    const cfg = getCustomProvider(cur);
+    const statusEl = document.getElementById('customProviderTestStatus');
+    if (!cfg) { statusEl.textContent = '⚠ Провайдер не выбран'; return; }
+    statusEl.textContent = '⏳ Проверка...';
+    statusEl.style.color = 'var(--text-2)';
+    try {
+      const list = await customProviderListModels(cfg, getCurrentKey());
+      statusEl.textContent = `✓ Подключено · ${list.length} моделей`;
+      statusEl.style.color = 'var(--success)';
+      loadModels();
+    } catch (e) {
+      statusEl.textContent = '✗ ' + (e.message || e);
+      statusEl.style.color = 'var(--error)';
+    }
+  });
+
+  // Первичная отрисовка списка кастомных провайдеров.
+  rebuildCustomProvidersUI();
+})();
 
 // ═══════════ Qwen AI Kit — обработчики кнопок ═══════════
 document.getElementById('qwenEnableThinking').addEventListener('change', saveSettings);
@@ -6593,7 +7176,127 @@ async function loadModels() {
   const key = getCurrentKey();
   const modelSelect = document.getElementById('model');
   const refreshBtn = document.getElementById('refreshModels');
-  
+
+  // ⭐ Ollama (локально / Cloud): /api/tags → fallback /v1/models.
+  if (provider === 'ollama') {
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '<i data-lucide="loader-2" class="spin"></i>';
+    if (window.lucide) window.lucide.createIcons();
+    setStatus('Загрузка моделей Ollama...', 'working');
+    try {
+      const base = getOllamaBase();
+      let models = [];
+      try {
+        models = await ollamaListModels(base, key);
+      } catch (e) {
+        console.warn('[OLLAMA] /api/tags failed, fallback to /v1/models:', e.message);
+        try {
+          const res = await fetch(base + '/v1/models', { headers: ollamaHeaders(key) });
+          if (res.ok) {
+            const data = await res.json();
+            const arr = data.data || (Array.isArray(data) ? data : []);
+            models = arr.map(m => ({
+              id: m.id || m.model || m,
+              name: m.id || m.model || m,
+              vendor: 'ollama',
+            }));
+          }
+        } catch (e2) {
+          console.warn('[OLLAMA] /v1/models fallback failed:', e2.message);
+        }
+      }
+
+      modelSelect.innerHTML = '';
+      if (!models.length) {
+        modelSelect.innerHTML = '<option value="">Нет установленных моделей</option>';
+        setStatus('⚠ Установите модель: ollama pull llama3.2:3b', 'error');
+      } else {
+        models.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.name || m.id;
+          modelSelect.appendChild(opt);
+        });
+        const stored = localStorage.getItem('agent_model');
+        if (stored && Array.from(modelSelect.options).find(o => o.value === stored)) {
+          modelSelect.value = stored;
+        } else {
+          modelSelect.value = models[0].id;
+        }
+        if (window.updateModelSelector) window.updateModelSelector(models);
+        setStatus(`✅ ${models.length} моделей Ollama загружено`, 'ok');
+      }
+    } catch (e) {
+      console.error('[OLLAMA] loadModels error:', e);
+      modelSelect.innerHTML = '<option value="">Ошибка: ' + (e.message || e) + '</option>';
+      setStatus('⚠ ' + (e.message || e), 'error');
+    } finally {
+      refreshBtn.disabled = false;
+      refreshBtn.innerHTML = '<i data-lucide="refresh-cw"></i>';
+      if (window.lucide) window.lucide.createIcons();
+    }
+    return;
+  }
+
+  // ⭐ Кастомные провайдеры: GET <baseUrl>/<modelsPath>
+  if (isCustomProvider(provider)) {
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '<i data-lucide="loader-2" class="spin"></i>';
+    if (window.lucide) window.lucide.createIcons();
+    const cfg = getCustomProvider(provider);
+    if (!cfg) {
+      modelSelect.innerHTML = '<option value="">Провайдер не найден</option>';
+      refreshBtn.disabled = false;
+      refreshBtn.innerHTML = '<i data-lucide="refresh-cw"></i>';
+      if (window.lucide) window.lucide.createIcons();
+      return;
+    }
+    setStatus('Загрузка моделей ' + cfg.name + '...', 'working');
+    try {
+      let models = [];
+      try {
+        models = await customProviderListModels(cfg, key);
+      } catch (e) {
+        console.warn('[CUSTOM:' + cfg.id + '] models endpoint failed:', e.message);
+      }
+
+      modelSelect.innerHTML = '';
+      if (!models.length && cfg.defaultModel) {
+        models = [{ id: cfg.defaultModel, name: cfg.defaultModel, vendor: cfg.id }];
+      }
+      if (!models.length) {
+        modelSelect.innerHTML = '<option value="">Список моделей пуст или эндпоинт недоступен</option>';
+        setStatus('⚠ Не удалось загрузить модели — введите id вручную в "Модели по умолчанию"', 'error');
+      } else {
+        models.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.name || m.id;
+          modelSelect.appendChild(opt);
+        });
+        const stored = localStorage.getItem('agent_model');
+        if (stored && Array.from(modelSelect.options).find(o => o.value === stored)) {
+          modelSelect.value = stored;
+        } else if (cfg.defaultModel && Array.from(modelSelect.options).find(o => o.value === cfg.defaultModel)) {
+          modelSelect.value = cfg.defaultModel;
+        } else {
+          modelSelect.value = models[0].id;
+        }
+        if (window.updateModelSelector) window.updateModelSelector(models);
+        setStatus(`✅ ${models.length} моделей ${cfg.name} загружено`, 'ok');
+      }
+    } catch (e) {
+      console.error('[CUSTOM:' + cfg.id + '] loadModels error:', e);
+      modelSelect.innerHTML = '<option value="">Ошибка: ' + (e.message || e) + '</option>';
+      setStatus('⚠ ' + (e.message || e), 'error');
+    } finally {
+      refreshBtn.disabled = false;
+      refreshBtn.innerHTML = '<i data-lucide="refresh-cw"></i>';
+      if (window.lucide) window.lucide.createIcons();
+    }
+    return;
+  }
+
   // ⭐ Puter.js: не требует API ключа
   if (provider === 'puter') {
     refreshBtn.disabled = true;
@@ -10720,11 +11423,22 @@ async function puterChatWithRetry(messages, options, maxRetries = 2) {
 async function callModel(messages) {
   const provider = document.getElementById('provider').value;
   const key = getCurrentKey();
-  if (provider !== 'puter' && !key) throw new Error('Введите API ключ');
+  // Puter не требует ключа; Ollama (локальный) тоже работает без ключа.
+  const isOllama = provider === 'ollama';
+  const isCustom = isCustomProvider(provider);
+  const keyOptional = provider === 'puter' || isOllama;
+  if (!keyOptional && !key) throw new Error('Введите API ключ');
   const model = document.getElementById('model').value.trim();
   if (!model) throw new Error('Выберите модель');
   currentAbortController = new AbortController();
-  
+
+  if (isOllama) {
+    return await callOllama(model, key, messages, getActiveToolDefs(), 0.2);
+  }
+  if (isCustom) {
+    return await callCustomProvider(provider, model, key, messages, getActiveToolDefs(), 0.2);
+  }
+
   // ⭐ Puter.js: бесплатный AI через SDK
   if (provider === 'puter') {
     if (!window.puter || !puter.ai) throw new Error('Puter.js SDK не загружен. Обновите страницу.');
@@ -11020,6 +11734,452 @@ async function nvidiaProxiedFetch(url, options = {}) {
     return fetch(finalUrl, options);
   }
   return fetch(url, options);
+}
+
+/* ========= Ollama (Local & Cloud) — полная интеграция API =========
+ * Поддерживается:
+ *   - chat через OpenAI-совместимый /v1/chat/completions (tools, vision, streaming)
+ *   - native /api/tags для списка установленных моделей
+ *   - native /api/pull для скачивания
+ *   - native /api/version для проверки соединения
+ *   - keep_alive, think (reasoning_content) — сквозные опции
+ *   - Ollama Cloud (ollama.com) — тот же путь, нужен Bearer-ключ
+ */
+
+/** Базовый URL Ollama без хвостовых слешей. */
+function getOllamaBase() {
+  const raw = (document.getElementById('ollamaBase')?.value || '').trim()
+    || localStorage.getItem('agent_ollama_base')
+    || 'http://localhost:11434';
+  return raw.replace(/\/+$/, '');
+}
+
+/** Текущие настройки Ollama (keep_alive, stream, show_thinking). */
+function getOllamaSettings() {
+  return {
+    keepAlive: (document.getElementById('ollamaKeepAlive')?.value || localStorage.getItem('agent_ollama_keep_alive') || '5m').trim() || '5m',
+    stream: (document.getElementById('ollamaStream')?.checked === true) || localStorage.getItem('agent_ollama_stream') === 'true',
+    showThinking: document.getElementById('ollamaShowThinking')
+      ? document.getElementById('ollamaShowThinking').checked
+      : (localStorage.getItem('agent_ollama_show_thinking') !== 'false'),
+  };
+}
+
+/** Парсинг keep_alive для native API (число секунд / "5m" / -1). */
+function parseOllamaKeepAlive(raw) {
+  const v = (raw || '').trim();
+  if (!v) return undefined;
+  const n = Number(v);
+  if (!Number.isNaN(n)) return n;        // 0, -1, 600, ...
+  return v;                                // "5m", "1h", "30s"
+}
+
+/**
+ * Подготовить сообщения для Ollama OpenAI-совместимого endpoint.
+ *
+ * Ollama принимает OpenAI-формат как есть, включая массивный content
+ * (text + image_url), поэтому правок почти не нужно. Для безопасности —
+ * пропускаем только поддерживаемые роли и убираем служебные поля
+ * (tool_calls в роли user/system, attachments-объекты).
+ */
+function prepareOllamaMessages(messages) {
+  return messages.map(m => {
+    const out = { role: m.role, content: m.content ?? '' };
+    if (m.role === 'tool') {
+      out.tool_call_id = m.tool_call_id;
+      if (m.name) out.name = m.name;
+    }
+    if (m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+      out.tool_calls = m.tool_calls.map(tc => ({
+        id: tc.id,
+        type: tc.type || 'function',
+        function: {
+          name: tc.function?.name,
+          arguments: typeof tc.function?.arguments === 'string'
+            ? tc.function.arguments
+            : JSON.stringify(tc.function?.arguments || {}),
+        },
+      }));
+    }
+    // Vision: если есть attachments c image — превращаем content в массив частей
+    if (m.attachments && Array.isArray(m.attachments) && m.attachments.length) {
+      const parts = [];
+      m.attachments.forEach(att => {
+        if (att.type === 'image') {
+          const dataUrl = att.dataUrl || (att.mime && att.b64 ? `data:${att.mime};base64,${att.b64}` : null);
+          if (dataUrl) parts.push({ type: 'image_url', image_url: { url: dataUrl } });
+        }
+      });
+      if (typeof out.content === 'string' && out.content) {
+        parts.push({ type: 'text', text: out.content });
+      }
+      if (parts.length) out.content = parts;
+    }
+    return out;
+  });
+}
+
+/** Заголовки для Ollama. Ключ опционален (нужен для Cloud / закрытого сервера). */
+function ollamaHeaders(key, accept) {
+  const h = {
+    'Content-Type': 'application/json',
+    'Accept': accept || 'application/json',
+  };
+  if (key) h['Authorization'] = 'Bearer ' + key;
+  return h;
+}
+
+/**
+ * Основной вызов Ollama для chat.
+ *   model      — id модели (например, "llama3.2:3b" или "gpt-oss:20b")
+ *   key        — опциональный API-ключ (для Ollama Cloud)
+ *   messages   — массив сообщений (наш внутренний формат)
+ *   tools      — function-calling инструменты (OpenAI shape)
+ *   temperature
+ *   signalOverride — для суб-агентов
+ */
+async function callOllama(model, key, messages, tools, temperature, signalOverride) {
+  const base = getOllamaBase();
+  if (!base) throw new Error('Укажите Ollama Base URL в настройках (по умолчанию http://localhost:11434).');
+  const settings = getOllamaSettings();
+  const useTools = Array.isArray(tools) && tools.length > 0;
+  const useStream = !!settings.stream;
+  const keepAlive = parseOllamaKeepAlive(settings.keepAlive);
+
+  const body = {
+    model,
+    messages: prepareOllamaMessages(messages),
+    temperature: typeof temperature === 'number' ? temperature : 0.2,
+    stream: useStream,
+    ...(useTools ? { tools, tool_choice: 'auto' } : {}),
+  };
+  // keep_alive в OpenAI-совместимом эндпоинте Ollama пробрасывается через top-level
+  if (keepAlive !== undefined) body.keep_alive = keepAlive;
+
+  const endpoint = base + '/v1/chat/completions';
+  const signal = signalOverride || (typeof currentAbortController !== 'undefined' && currentAbortController ? currentAbortController.signal : undefined);
+
+  console.log('[OLLAMA] →', model, endpoint, '| tools:', useTools ? tools.length : 0, '| stream:', useStream, '| keep_alive:', keepAlive);
+
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: ollamaHeaders(key, useStream ? 'text/event-stream' : 'application/json'),
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (netErr) {
+    if (netErr.name === 'AbortError') throw netErr;
+    if (netErr.name === 'TypeError' || (netErr.message || '').includes('fetch')) {
+      throw new Error(
+        `Ollama недоступна по адресу ${base}. ` +
+        `Проверьте: 1) сервис запущен (ollama serve); ` +
+        `2) если Cloud — указали ключ из ollama.com → API Keys; ` +
+        `3) корректный Base URL в настройках.`
+      );
+    }
+    throw netErr;
+  }
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => res.statusText);
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`Ollama HTTP ${res.status}: для Ollama Cloud нужен валидный API-ключ.`);
+    }
+    if (res.status === 404) {
+      throw new Error(`Ollama HTTP 404: модель «${model}» не установлена. Скачайте через "Pull / скачать модель" или \`ollama pull ${model}\`.`);
+    }
+    throw new Error('Ollama HTTP ' + res.status + ': ' + t);
+  }
+
+  if (!useStream) {
+    const data = await res.json();
+    if (data.usage) tokenTracker.update(data.usage);
+    const msg = data.choices?.[0]?.message;
+    if (!msg) throw new Error('Ollama: пустой ответ от модели');
+    if (msg.reasoning_content && settings.showThinking) {
+      msg.reasoning = msg.reasoning_content;
+    }
+    return msg;
+  }
+
+  // Streaming SSE — собираем content / reasoning_content / tool_calls.
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('Ollama: streaming недоступен (нет ReadableStream)');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let role = 'assistant';
+  let content = '';
+  let reasoning = '';
+  const toolCallsAcc = new Map();
+  let lastUsage = null;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || '';
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line || !line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (payload === '[DONE]') continue;
+      let evt;
+      try { evt = JSON.parse(payload); } catch { continue; }
+      if (evt.usage) lastUsage = evt.usage;
+      const delta = evt.choices?.[0]?.delta;
+      if (!delta) continue;
+      if (delta.role) role = delta.role;
+      if (typeof delta.content === 'string') content += delta.content;
+      if (typeof delta.reasoning_content === 'string') reasoning += delta.reasoning_content;
+      if (Array.isArray(delta.tool_calls)) {
+        for (const tc of delta.tool_calls) {
+          const idx = tc.index ?? 0;
+          const cur = toolCallsAcc.get(idx) || { id: tc.id || '', type: tc.type || 'function', function: { name: '', arguments: '' } };
+          if (tc.id) cur.id = tc.id;
+          if (tc.function?.name) cur.function.name += tc.function.name;
+          if (tc.function?.arguments) cur.function.arguments += tc.function.arguments;
+          toolCallsAcc.set(idx, cur);
+        }
+      }
+    }
+  }
+  if (lastUsage) tokenTracker.update(lastUsage);
+  const msg = { role, content: content || null };
+  if (reasoning && settings.showThinking) msg.reasoning = reasoning;
+  if (toolCallsAcc.size) {
+    msg.tool_calls = Array.from(toolCallsAcc.values()).map((tc, i) => ({
+      id: tc.id || ('ollama_' + Math.random().toString(36).slice(2, 10) + '_' + i),
+      type: tc.type || 'function',
+      function: {
+        name: tc.function.name || '',
+        arguments: tc.function.arguments || '{}',
+      },
+    }));
+  }
+  return msg;
+}
+
+/** GET /api/version — для health-check. */
+async function ollamaPing(base, key) {
+  const url = (base || getOllamaBase()).replace(/\/+$/, '') + '/api/version';
+  const res = await fetch(url, { headers: ollamaHeaders(key) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+/** GET /api/tags — установленные локально модели + метаданные. */
+async function ollamaListModels(base, key) {
+  const url = (base || getOllamaBase()).replace(/\/+$/, '') + '/api/tags';
+  const res = await fetch(url, { headers: ollamaHeaders(key) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  const arr = Array.isArray(data?.models) ? data.models : [];
+  return arr.map(m => {
+    const id = m.name || m.model;
+    const details = m.details || {};
+    const family = details.family || (Array.isArray(details.families) ? details.families[0] : '') || 'ollama';
+    const sizeStr = m.size ? `${(m.size / 1e9).toFixed(1)} GB` : '';
+    const pname = details.parameter_size ? `${details.parameter_size}` : '';
+    const quant = details.quantization_level ? `${details.quantization_level}` : '';
+    const tags = [pname, quant, sizeStr].filter(Boolean).join(' · ');
+    return {
+      id,
+      name: tags ? `${id} (${tags})` : id,
+      vendor: family,
+      context: null,
+      family,
+      parameter_size: details.parameter_size,
+      quantization_level: details.quantization_level,
+      size: m.size,
+    };
+  });
+}
+
+/** POST /api/pull — стримит прогресс через ndjson. */
+async function ollamaPullModel(modelName, base, key, onProgress) {
+  const url = (base || getOllamaBase()).replace(/\/+$/, '') + '/api/pull';
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: ollamaHeaders(key),
+    body: JSON.stringify({ model: modelName, stream: true }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => res.statusText);
+    throw new Error('Ollama pull HTTP ' + res.status + ': ' + t);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('Ollama pull: нет ReadableStream');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) continue;
+      try {
+        const evt = JSON.parse(t);
+        if (typeof onProgress === 'function') onProgress(evt);
+      } catch {
+        // ignore non-json
+      }
+    }
+  }
+  if (buffer.trim()) {
+    try {
+      const evt = JSON.parse(buffer.trim());
+      if (typeof onProgress === 'function') onProgress(evt);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+/* ========= Кастомные провайдеры (OpenAI-совместимые) ========= */
+/**
+ * Любой OpenAI-совместимый сервер: TogetherAI, Anyscale, Fireworks, Cerebras,
+ * Sambanova, LM Studio, vLLM, llama.cpp/llamafile, локальные FastAPI-обёртки и т.д.
+ *
+ * Хранение: localStorage["agent_custom_providers"] = JSON-массив
+ *   [{ id, name, baseUrl, modelsPath, chatPath, defaultModel, headers: [{k,v}] }]
+ * API-ключ для каждого провайдера хранится в `agent_key_custom:<id>` —
+ * совместимо со стандартным getCurrentKey()/saveCurrentKey().
+ */
+
+const CUSTOM_PROVIDERS_LS = 'agent_custom_providers';
+const CUSTOM_PROVIDER_PREFIX = 'custom:';
+
+function isCustomProvider(provider) {
+  return typeof provider === 'string' && provider.startsWith(CUSTOM_PROVIDER_PREFIX);
+}
+
+function customProviderId(provider) {
+  return isCustomProvider(provider) ? provider.slice(CUSTOM_PROVIDER_PREFIX.length) : '';
+}
+
+function getCustomProviders() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PROVIDERS_LS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomProviders(arr) {
+  localStorage.setItem(CUSTOM_PROVIDERS_LS, JSON.stringify(arr || []));
+}
+
+function getCustomProvider(idOrFull) {
+  const id = isCustomProvider(idOrFull) ? customProviderId(idOrFull) : idOrFull;
+  return getCustomProviders().find(p => p.id === id) || null;
+}
+
+function slugifyProviderId(name) {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || ('provider-' + Math.random().toString(36).slice(2, 8));
+}
+
+/** Заголовки для кастомного провайдера: Bearer-ключ + произвольные пары. */
+function customProviderHeaders(cfg, key) {
+  const h = { 'Content-Type': 'application/json' };
+  if (key) h['Authorization'] = 'Bearer ' + key;
+  if (cfg && Array.isArray(cfg.headers)) {
+    for (const pair of cfg.headers) {
+      if (pair && pair.k) h[String(pair.k)] = String(pair.v ?? '');
+    }
+  }
+  return h;
+}
+
+/** Полный URL chat-эндпоинта кастомного провайдера. */
+function customProviderChatUrl(cfg) {
+  const base = (cfg.baseUrl || '').replace(/\/+$/, '');
+  const path = (cfg.chatPath || '/chat/completions').replace(/^\/+/, '/');
+  return base + path;
+}
+
+/** Полный URL списка моделей. */
+function customProviderModelsUrl(cfg) {
+  const base = (cfg.baseUrl || '').replace(/\/+$/, '');
+  const path = (cfg.modelsPath || '/models').replace(/^\/+/, '/');
+  return base + path;
+}
+
+/** Вызов кастомного провайдера (OpenAI-совместимый /chat/completions). */
+async function callCustomProvider(provider, model, key, messages, tools, temperature, signalOverride) {
+  const cfg = getCustomProvider(provider);
+  if (!cfg) throw new Error('Кастомный провайдер не найден. Откройте Настройки → Нейросеть.');
+  const useTools = Array.isArray(tools) && tools.length > 0;
+
+  const body = {
+    model,
+    messages,
+    temperature: typeof temperature === 'number' ? temperature : 0.2,
+    stream: false,
+    ...(useTools ? { tools, tool_choice: 'auto' } : {}),
+  };
+
+  const endpoint = customProviderChatUrl(cfg);
+  const signal = signalOverride || (typeof currentAbortController !== 'undefined' && currentAbortController ? currentAbortController.signal : undefined);
+  console.log('[CUSTOM:' + cfg.id + '] →', model, endpoint, '| tools:', useTools ? tools.length : 0);
+
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: customProviderHeaders(cfg, key),
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (netErr) {
+    if (netErr.name === 'AbortError') throw netErr;
+    if (netErr.name === 'TypeError' || (netErr.message || '').includes('fetch')) {
+      throw new Error(`Кастомный провайдер «${cfg.name}» недоступен по ${cfg.baseUrl}. Проверьте URL/ключ/CORS.`);
+    }
+    throw netErr;
+  }
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => res.statusText);
+    throw new Error('Кастомный провайдер HTTP ' + res.status + ': ' + t);
+  }
+  const data = await res.json();
+  if (data.usage) tokenTracker.update(data.usage);
+  const msg = data.choices?.[0]?.message;
+  if (!msg) throw new Error('Кастомный провайдер: пустой ответ от модели');
+  if (msg.reasoning_content && !msg.reasoning) {
+    msg.reasoning = msg.reasoning_content;
+  }
+  return msg;
+}
+
+/** GET список моделей кастомного провайдера (OpenAI shape). */
+async function customProviderListModels(cfg, key) {
+  const url = customProviderModelsUrl(cfg);
+  const res = await fetch(url, { headers: customProviderHeaders(cfg, key) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  const arr = data?.data || (Array.isArray(data) ? data : data?.models || []);
+  return arr
+    .map(m => ({
+      id: m.id || m.model || (typeof m === 'string' ? m : null),
+      name: m.id || m.model || (typeof m === 'string' ? m : null),
+      context: m.context_length || m.context_window || null,
+      vendor: m.owned_by || m.provider || cfg.id,
+    }))
+    .filter(m => m.id);
 }
 
 /* ========= Qwen AI Kit — полная интеграция API ========= */
@@ -12757,10 +13917,25 @@ async function runSubAgent(task, context = '', stepTitle = 'Sub-task', uiElement
 async function callSubAgentModel(messages, subTools) {
   const provider = document.getElementById('provider').value;
   const key = getCurrentKey();
-  if (provider !== 'puter' && !key) throw new Error('Нет API ключа');
+  const isOllama = provider === 'ollama';
+  const isCustom = isCustomProvider(provider);
+  const keyOptional = provider === 'puter' || isOllama;
+  if (!keyOptional && !key) throw new Error('Нет API ключа');
   const model = document.getElementById('model').value.trim();
   if (!model) throw new Error('Нет модели');
-  
+
+  // Sub-agent для Ollama / кастомных провайдеров — отдельным AbortController.
+  if (isOllama || isCustom) {
+    const subController = new AbortController();
+    if (currentAbortController) {
+      currentAbortController.signal.addEventListener('abort', () => subController.abort());
+    }
+    if (isOllama) {
+      return await callOllama(model, key, messages, subTools, 0.15, subController.signal);
+    }
+    return await callCustomProvider(provider, model, key, messages, subTools, 0.15, subController.signal);
+  }
+
   // ⭐ Puter.js sub-agent
   if (provider === 'puter') {
     if (!window.puter || !puter.ai) throw new Error('Puter.js SDK не загружен');
