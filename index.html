@@ -9620,7 +9620,7 @@ const toolDefs = [
     type: 'function',
     function: {
       name: 'end_task',
-      description: 'Signal that the entire task is complete and you have nothing more to do. Call this LAST, after all work is finished and (if a plan exists) every plan step is marked done via update_plan. The agent loop ENDS only when you call end_task; otherwise the system will keep prompting you to continue. Three valid usage patterns: (1) Write your final reply as plain text AND call end_task in the same turn — your text becomes the final user-facing message. (2) Call end_task alone with NO text content — the system uses your most recent text reply (the one the system nudged you about) as the final message. (3) Pass an explicit "end_message" argument — that text becomes the final message. Do NOT call end_task while you still have pending steps or unresolved errors.',
+      description: 'Hand the turn back to the user. Call this when you want to stop or pause — it closes your current turn and waits for the next user message. Until you call end_task, the agent loop continues, so you can keep working with tools or text as long as you want. Three usage patterns: (1) Write your final reply as plain text AND call end_task in the same turn — your text becomes the final user-facing message. (2) Call end_task alone with NO text content — the system uses your most recent text reply as the final message. (3) Pass an explicit "end_message" argument — that text becomes the final message. Use it whenever you decide the turn is done (final answer, waiting for input, nothing more to do). If you want to keep working, simply do not call it.',
       parameters: {
         type: 'object',
         properties: {
@@ -13716,11 +13716,11 @@ Delegation (optional):
 - delegate_task(task, context?, step_title) — send a micro-task to an isolated sub-agent. The sub-agent has file tools but zero memory of this conversation. Describe everything it needs. Useful for parallelizing work or isolating complex subtasks.
 
 Completion:
-- end_task() — REQUIRED to end your turn. The agent loop runs continuously until you explicitly call this tool. A plain text reply WITHOUT a tool call does NOT finish the task — the system will nudge you to either keep working or call end_task. Three valid completion patterns:
+- end_task() — call this when you decide your turn is done and you want to hand control back to the user (final answer, waiting for input, or simply nothing more to do). The agent loop keeps running until you call it, so you have free choice between continuing (text or tools) and stopping. There is no requirement to use any tool on a given turn — if you just want to keep thinking out loud in text, that's fine; the system will only gently remind you that end_task is how you pause/stop. Three completion patterns:
     (a) Write your final reply as text AND call end_task in the same turn → your text becomes the user-facing closing message.
-    (b) After a text-only reply got nudged: on the next turn, call end_task ALONE (no text, no end_message) → your previous text is used as the closing message.
+    (b) After a text-only reply: on a later turn, call end_task ALONE (no text, no end_message) → your previous text is used as the closing message.
     (c) Override: call end_task(end_message="...") → that string becomes the closing message regardless of your text content.
-  Call end_task only when ALL work is genuinely done (and, if a plan exists, every step is marked done via update_plan first). Even for trivial requests like greetings, write the greeting as text and call end_task in the same turn.
+  For trivial requests like greetings, you can either reply in text and let the next nudge remind you, or write the greeting and call end_task in the same turn — whichever feels natural.
 
 TIPS:
 - Read before edit. Use read_file(path, start_line, end_line) to load ONLY the relevant section — saves context and is faster.
@@ -13815,7 +13815,7 @@ RULES:
 - After edit_lines/insert_content, line numbers shift — re-read before next edit.
 - If changing >50% of a file, rewrite it entirely with write_file.
 - Focus on QUALITY: clean code, proper naming, correct logic.
-- To FINISH, call end_task with a BRIEF report (2-5 sentences) describing what you did, which files changed, and any decisions. You can either: (a) write the report as your assistant text and call end_task() in the same turn, OR (b) pass the report as end_task(end_message="..."). The agent loop ends only when end_task is called — a plain text reply alone does NOT finish your turn.`;
+- When you want to finish, call end_task with a BRIEF report (2-5 sentences) describing what you did, which files changed, and any decisions. You can either: (a) write the report as your assistant text and call end_task() in the same turn, OR (b) pass the report as end_task(end_message="..."). Until you call end_task you are free to keep working with tools or write more text — the loop only stops when you explicitly call it.`;
 
 // Tools available to sub-agents (no delegate_task, no update_plan)
 function getSubAgentToolDefs() {
@@ -13905,7 +13905,7 @@ async function runSubAgent(task, context = '', stepTitle = 'Sub-task', uiElement
         updateUI(subLog, `шаг ${step + 1}...`, 'working');
         subMessages.push({
           role: 'user',
-          content: `[Системное сообщение] При обращении к модели произошла ошибка: ${e.message}. Не повторяй уже сделанное. Когда задача выполнена — вызови end_task.`
+          content: `[Системное сообщение] При обращении к модели произошла ошибка: ${e.message}. Не повторяй уже сделанное. Можешь продолжить работу инструментами или текстом; когда сам решишь, что пора остановиться — вызови end_task.`
         });
         step++;
         continue;
@@ -13980,12 +13980,12 @@ async function runSubAgent(task, context = '', stepTitle = 'Sub-task', uiElement
         subMessages.push({ role: 'assistant', content: lastAssistantText });
       }
       if (subConsecutiveNoTool >= MAX_SUB_NO_TOOL) {
-        subLog.push({ icon: 'alert-circle', text: 'Не вызвал end_task — завершаю принудительно' });
+        subLog.push({ icon: 'alert-circle', text: 'Достигнут лимит без end_task — завершаю' });
         break;
       }
       subMessages.push({
         role: 'user',
-        content: `[Системное напоминание] Ты ответил текстом, но не вызвал ни одного инструмента и не вызвал end_task. Текстовый ответ сам по себе не завершает работу. Если задача выполнена — вызови end_task() БЕЗ аргументов в следующем turn'е, и твой только что написанный текст автоматически станет финальным отчётом. Если ещё есть что доделать — продолжай работать инструментами, не повторяй уже сделанное.`
+        content: `[Системное напоминание] Получен текстовый ответ. Просто чтобы ты знал, как закрыть ход: если хочешь остановиться или поставить задачу на паузу — вызови end_task() в следующем turn'е, и твой только что написанный текст автоматически станет финальным отчётом. Если ещё есть что сделать — просто продолжай работу (инструментами или текстом), без давления использовать какой-то конкретный инструмент. Решение за тобой.`
       });
       updateUI(subLog, `шаг ${step + 1}...`, 'working');
       step++;
@@ -14749,7 +14749,7 @@ async function runAgent(userText) {
         }
         chat.messages.push({
           role: 'user',
-          content: `[Системное сообщение] При обращении к модели произошла ошибка: ${errMsg}. Не повторяй уже сделанное. Если задача ещё не завершена — продолжай работать инструментами; когда всё готово — вызови end_task.`,
+          content: `[Системное сообщение] При обращении к модели произошла ошибка: ${errMsg}. Не повторяй уже сделанное. Можешь продолжить работу как считаешь нужным (инструментами или текстом); когда сам решишь, что пора остановиться, — вызови end_task.`,
           _ephemeral: true
         });
         step++;
@@ -14879,21 +14879,25 @@ async function runAgent(userText) {
       }
 
       if (consecutiveNoTool >= MAX_CONSECUTIVE_NO_TOOL) {
-        addEphemeralSystem(`⚠️ Модель ${MAX_CONSECUTIVE_NO_TOOL} раза подряд не вызвала ни одного инструмента и не вызвала end_task. Останавливаю автопродолжение — напишите «продолжи» или уточните задачу.`);
+        addEphemeralSystem(`⚠️ Модель ${MAX_CONSECUTIVE_NO_TOOL} раза подряд ответила только текстом и не вызвала end_task. Делаю паузу — напишите «продолжи» или уточните задачу.`);
         break;
       }
 
-      // Build context-aware nudge
+      // Build context-aware nudge.
+      // Tone: neutral information, NOT a command. The model decides whether to
+      // continue (text or tools) or stop (end_task). We never tell it that it
+      // "must" use a tool — that framing was confusing models into ignoring the
+      // real choice between continuing and stopping.
       const planProgress = getPlanProgress();
       let nudgeText;
       if (currentPlan.length > 0 && !planProgress.complete) {
         const remaining = currentPlan.filter(s => !s.done).map(s => '"' + s.title + '"').join(', ');
-        nudgeText = `[Системное напоминание] Ты ответил текстом, но не вызвал ни одного инструмента — работа НЕ завершена. План ещё не выполнен (${planProgress.done}/${planProgress.total}). Остаются шаги: ${remaining}. Не повторяй уже сделанное — продолжай ровно с того места, где остановился: вызывай инструменты и помечай шаги через update_plan. Когда задача действительно завершена — вызови end_task. Текстовый ответ без tool_call работу НЕ завершает.`;
+        nudgeText = `[Системное напоминание] Получен текстовый ответ. Просто на всякий случай: план ещё не отмечен выполненным (${planProgress.done}/${planProgress.total}, остаются шаги: ${remaining}). Если хочешь остановиться/передать ход пользователю прямо сейчас — вызови end_task, и твой только что написанный текст станет финальным сообщением. Если хочешь продолжить — просто продолжай так, как считаешь нужным: инструментами, текстом или комбинацией. Решение за тобой, никаких "обязательно использовать инструмент".`;
       } else {
-        nudgeText = `[Системное напоминание] Ты ответил текстом, но не вызвал ни одного инструмента — сам по себе текст работу НЕ завершает. Если задача действительно выполнена — вызови end_task() БЕЗ аргументов в следующем turn'е, и твой только что написанный текст автоматически станет финальным ответом пользователю (дублировать его в end_message не нужно). Если ещё нет — продолжай работать инструментами, не повторяй уже сделанное.`;
+        nudgeText = `[Системное напоминание] Получен текстовый ответ. Чтобы ты знал, как устроен цикл: пока ты не вызовешь end_task, ход остаётся за тобой. Если хочешь остановиться или поставить задачу на паузу — вызови end_task() (твой только что написанный текст автоматически станет финальным сообщением пользователю; повторять его в end_message не нужно). Если хочешь продолжить работу — просто продолжай: можно текстом, можно инструментами, как тебе удобнее. Никаких требований обязательно использовать инструмент нет.`;
       }
       chat.messages.push({ role: 'user', content: nudgeText, _ephemeral: true });
-      setStatus('⚠️ Нет вызова инструмента — напоминаем модели...', 'working');
+      setStatus('Напоминание про end_task отправлено модели...', 'working');
       step++;
     }
 
