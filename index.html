@@ -11589,14 +11589,111 @@ function getActiveToolDefs() {
   const mcp = (typeof MCPRegistry !== 'undefined') ? MCPRegistry.toolDefs() : [];
   return [...getToolDefsWithSkills(), ...mcp];
 }
+/**
+ * Gemini принимает только подмножество OpenAPI 3.0 Schema:
+ *   https://ai.google.dev/api/caching#Schema
+ *
+ * Любые JSON Schema-расширения (`$schema`, `$id`, `$ref`, `$defs`, `definitions`,
+ * `additionalProperties`, `propertyNames`, `oneOf`, `allOf`, `not`, `const`,
+ * `dependencies`, `contains`, и т.п.) приводят к ошибке 400 INVALID_ARGUMENT.
+ *
+ * Этот санитайзер рекурсивно вычищает неподдерживаемые поля и нормализует
+ * `oneOf` → `anyOf`, `const` → `enum`, `additionalProperties: <schema>` →
+ * простое игнорирование (Gemini считает свободные ключи разрешёнными по
+ * умолчанию).
+ */
+const GEMINI_SUPPORTED_SCHEMA_KEYS = new Set([
+  'type', 'format', 'title', 'description', 'nullable',
+  'enum', 'maxItems', 'minItems', 'properties', 'required',
+  'minProperties', 'maxProperties', 'minLength', 'maxLength',
+  'pattern', 'example', 'anyOf', 'propertyOrdering', 'default',
+  'items', 'minimum', 'maximum',
+]);
+
+function geminiSanitizeSchema(schema) {
+  if (schema === null || schema === undefined) return schema;
+  if (typeof schema !== 'object') return schema;
+  if (Array.isArray(schema)) return schema.map(geminiSanitizeSchema);
+
+  const out = {};
+  for (const [k, v] of Object.entries(schema)) {
+    if (k === '$schema' || k === '$id' || k === '$comment' ||
+        k === '$defs' || k === 'definitions' ||
+        k === 'additionalProperties' || k === 'propertyNames' ||
+        k === 'patternProperties' || k === 'unevaluatedProperties' ||
+        k === 'allOf' || k === 'not' || k === 'if' || k === 'then' || k === 'else' ||
+        k === 'dependencies' || k === 'dependentRequired' || k === 'dependentSchemas' ||
+        k === 'contains' || k === 'minContains' || k === 'maxContains' ||
+        k === 'unevaluatedItems' || k === 'prefixItems' ||
+        k === 'readOnly' || k === 'writeOnly' || k === 'deprecated' ||
+        k === 'examples') {
+      // skip — не поддерживается Gemini
+      continue;
+    }
+    if (k === '$ref') {
+      // Внешние/внутренние $ref Gemini не понимает. Описываем как
+      // free-form объект (не падать). Если пользователь использует $ref —
+      // лучше его инлайнить на стороне MCP.
+      continue;
+    }
+    if (k === 'const') {
+      // const → enum с одним значением.
+      out.enum = [v];
+      continue;
+    }
+    if (k === 'oneOf') {
+      // Gemini не поддерживает oneOf, но поддерживает anyOf. Семантически это
+      // строже, но достаточно для function-calling сценариев.
+      if (Array.isArray(v)) out.anyOf = v.map(geminiSanitizeSchema);
+      continue;
+    }
+    if (k === 'anyOf') {
+      if (Array.isArray(v)) out.anyOf = v.map(geminiSanitizeSchema);
+      continue;
+    }
+    if (k === 'properties' && v && typeof v === 'object') {
+      const cleaned = {};
+      for (const [pk, pv] of Object.entries(v)) cleaned[pk] = geminiSanitizeSchema(pv);
+      out.properties = cleaned;
+      continue;
+    }
+    if (k === 'items') {
+      out.items = geminiSanitizeSchema(v);
+      continue;
+    }
+    if (GEMINI_SUPPORTED_SCHEMA_KEYS.has(k)) {
+      out[k] = v;
+      continue;
+    }
+    // Любое другое расширение — отбрасываем.
+  }
+  // Gemini требует, чтобы у объектов с properties был type=OBJECT (или строка
+  // 'object'); у массивов с items — type=ARRAY. Если type не задан, но есть
+  // характерные поля — выставим разумный default.
+  if (!out.type) {
+    if (out.properties) out.type = 'object';
+    else if (out.items) out.type = 'array';
+  }
+  return out;
+}
+
+/** Преобразовать одну OpenAI-стайл декларацию инструмента в Gemini FunctionDeclaration. */
+function geminiToFunctionDeclaration(toolDef) {
+  const fn = toolDef && toolDef.function ? toolDef.function : {};
+  const decl = {
+    name: fn.name,
+    description: fn.description || '',
+  };
+  if (fn.parameters) {
+    decl.parameters = geminiSanitizeSchema(fn.parameters);
+  }
+  return decl;
+}
+
 function getActiveGeminiToolDefs() {
   const mcp = (typeof MCPRegistry !== 'undefined') ? MCPRegistry.toolDefs() : [];
   return {
-    function_declarations: [...getToolDefsWithSkills(), ...mcp].map(t => ({
-      name: t.function.name,
-      description: t.function.description,
-      parameters: t.function.parameters
-    }))
+    function_declarations: [...getToolDefsWithSkills(), ...mcp].map(geminiToFunctionDeclaration)
   };
 }
 
@@ -12011,7 +12108,17 @@ function geminiBuildContents(messages) {
 function geminiBuildTools(functionDeclarations, settings) {
   const tools = [];
   if (functionDeclarations && functionDeclarations.length > 0) {
-    tools.push({ functionDeclarations });
+    // Defense-in-depth: всегда прогоняем декларации через санитайзер схемы,
+    // даже если их вызывающий уже подготовил. Это страхует от MCP/skills
+    // тулзов с JSON-Schema расширениями ($schema, additionalProperties и т.п.),
+    // которые Gemini не понимает.
+    const safeDecls = functionDeclarations.map(d => {
+      if (!d || typeof d !== 'object') return d;
+      const out = { name: d.name, description: d.description || '' };
+      if (d.parameters) out.parameters = geminiSanitizeSchema(d.parameters);
+      return out;
+    });
+    tools.push({ functionDeclarations: safeDecls });
   }
   if (settings.googleSearch) tools.push({ googleSearch: {} });
   if (settings.urlContext) tools.push({ urlContext: {} });
